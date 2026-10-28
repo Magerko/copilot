@@ -23,7 +23,7 @@ const MESSAGES: Record<ErrorCode, string> = {
 }
 
 export function appError(code: ErrorCode, detail?: string, status?: number): AppError {
-  // Providers echo the rejected key in 401 bodies; detail reaches the UI and the screen may be shared.
+  // Providers echo the rejected key in 401 bodies; detail reaches the UI and the screen may be shared, so I redact it.
   return { code, message: MESSAGES[code], detail: detail === undefined ? undefined : redact(detail).slice(0, 400), status }
 }
 
@@ -78,7 +78,7 @@ export function isRetryable(err: AppError): boolean {
   return err.code === 'rate_limit' || err.code === 'server' || err.code === 'network'
 }
 
-/** Parameter-rejection 400s that we can recover from by dropping an optional field. */
+/** Parameter-rejection 400s I can recover from by dropping an optional field. */
 export function rejectsParam(err: AppError, param: string): boolean {
   return err.code === 'bad_request' && (err.detail ?? '').toLowerCase().includes(param)
 }

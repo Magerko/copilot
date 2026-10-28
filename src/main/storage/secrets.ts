@@ -8,7 +8,7 @@ export interface Cipher {
 }
 
 /**
- * Keys never touch settings.json or SQLite. The file holds only DPAPI blobs (Electron safeStorage),
+ * I never let keys touch settings.json or SQLite. The file holds only DPAPI blobs (Electron safeStorage),
  * which decrypt solely under the same Windows user.
  */
 export class SecretStore {

@@ -29,7 +29,7 @@ export function createDashboard(): BrowserWindow {
     title: 'Kairos M',
     backgroundColor: '#0f1115',
     autoHideMenuBar: true,
-    // Audio capture lives in this renderer: it must keep running while minimized to tray.
+    // Audio capture lives in this renderer, so I keep it running while minimized to tray.
     webPreferences: { ...webPreferences, backgroundThrottling: false }
   })
   load(win, 'index')
@@ -51,7 +51,7 @@ export function defaultOverlayBounds(): Rectangle {
   return { x: wa.x + wa.width - width - 24, y: wa.y + 24, width, height }
 }
 
-/** Restores saved bounds only if they are still visible on some connected display. */
+/** I restore saved bounds only if they are still visible on some connected display. */
 export function sanitizeBounds(b: OverlaySettings['bounds']): Rectangle {
   if (!b) return defaultOverlayBounds()
   const visible = screen.getAllDisplays().some((d) => {
@@ -76,10 +76,10 @@ export function createOverlay(o: OverlaySettings): BrowserWindow {
     fullscreenable: false,
     skipTaskbar: true,
     alwaysOnTop: o.pinned,
-    // Never takes keyboard focus: typing in the IDE/meeting app keeps going there (FR-O01, FR-O05; spike S1).
+    // I never let it take keyboard focus: typing in the IDE/meeting app keeps going there (FR-O01, FR-O05; spike S1).
     focusable: false,
     hasShadow: false,
-    // Transparent so the panel background can be semi-see-through while the text stays fully opaque (CSS controls the alpha).
+    // I make it transparent so the panel background can be semi-see-through while the text stays fully opaque (CSS controls the alpha).
     transparent: true,
     backgroundColor: '#00000000',
     title: 'Kairos M — подсказки',

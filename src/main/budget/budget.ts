@@ -9,8 +9,8 @@ export interface BudgetDeps {
 }
 
 /**
- * Money limits apply only to paid (non-loopback) providers with a known price.
- * Unknown price ⇒ cost stays null and the UI warns that $-limits cannot be enforced for that model.
+ * I apply money limits only to paid (non-loopback) providers with a known price.
+ * With an unknown price, cost stays null and the UI warns that $-limits cannot be enforced for that model.
  */
 export class BudgetManager {
   private sessionUsd = 0
@@ -32,7 +32,7 @@ export class BudgetManager {
     this.day = dayKey(deps.now())
   }
 
-  // The app may stay open across midnight; the daily limit then restarts from zero.
+  // The app may stay open across midnight, so I restart the daily limit from zero.
   private rollover(): void {
     const d = dayKey(this.deps.now())
     if (d === this.day) return

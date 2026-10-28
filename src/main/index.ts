@@ -52,10 +52,10 @@ import { appIcon } from './util/png'
 import { createDashboard, createOverlay, createPicker, displayProtectionSupported, sanitizeBounds } from './windows/windows'
 
 app.setAppUserModelId('app.kairos-m')
-// Runtime data lives outside OneDrive/Cyrillic paths: whisper.cpp opens model files with ANSI APIs.
+// I keep runtime data outside OneDrive/Cyrillic paths: whisper.cpp opens model files with ANSI APIs.
 app.setPath('userData', join(app.getPath('appData'), 'kairos-m'))
-// The lock is keyed by userData, so it must follow setPath; app.quit() alone lets this module keep running
-// and a second instance would run migrations and mark the live session as interrupted.
+// I key the lock by userData, so it has to come after setPath; app.quit() alone would leave this module
+// running, and a second instance would run migrations and mark the live session as interrupted.
 if (!app.requestSingleInstanceLock()) process.exit(0)
 
 const dataDir = app.getPath('userData')
@@ -84,7 +84,7 @@ function log(kind: string, data: unknown): void {
   try {
     db.logDiag(kind, redactDeep(data))
   } catch {
-    // diagnostics must never break the app
+    // I never let diagnostics break the app
   }
 }
 
@@ -106,7 +106,7 @@ function profile(): Profile {
   return all.find((p) => p.id === s().activeProfileId) ?? all[0]
 }
 
-// Snapshot broadcast is coalesced: streaming emits per token, the UI needs ≤ 30 fps.
+// I coalesce the snapshot broadcast: streaming emits per token, the UI needs ≤ 30 fps.
 let emitTimer: NodeJS.Timeout | null = null
 function emit(): void {
   if (emitTimer) return
@@ -166,7 +166,7 @@ function applySettings(prev: Settings | null): void {
   broadcast('km:settings', st)
 }
 
-// Windows gives no feedback on whether a capture tool honours the flag, so 'set' is never shown as a green guarantee.
+// Windows gives no feedback on whether a capture tool honours the flag, so I never show 'set' as a green guarantee.
 function applyProtection(): void {
   const want = s().overlay.protect
   const supported = displayProtectionSupported()
@@ -213,7 +213,7 @@ function ensureOverlay(): BrowserWindow {
 function showOverlay(): void {
   const w = ensureOverlay()
   w.setBounds(sanitizeBounds(w.getBounds()))
-  // showInactive: the foreground window (IDE, Zoom) keeps keyboard focus (spike S1).
+  // I show it inactive so the foreground window (IDE, Zoom) keeps keyboard focus (spike S1).
   w.showInactive()
   sessionMgr.setStatus('overlay', { state: 'ok', label: s().overlay.expanded ? 'развёрнут' : 'компактный' })
 }
@@ -237,20 +237,20 @@ function makeDashboard(): BrowserWindow {
   let trayHintShown = false
   const toTray = () => {
     w.hide()
-    // One-time nudge so the window doesn't just "vanish" the first time.
+    // I nudge once so the window doesn't just "vanish" the first time.
     if (!trayHintShown && tray) {
       trayHintShown = true
       tray.displayBalloon?.({ title: 'Kairos M', content: 'Свёрнуто в трей. Нажмите значок, чтобы открыть.' })
     }
   }
   w.on('close', (e) => {
-    // Close hides to tray unless the user is quitting; the session (and its capture) keeps running.
+    // I hide to tray on close unless the user is quitting; the session (and its capture) keeps running.
     if (!quitting && (s().window.minimizeToTray || sessionMgr.active)) {
       e.preventDefault()
       toTray()
     }
   })
-  // 'minimize' fires after the fact and preventDefault is unreliable, so hide the already-minimized window instead.
+  // 'minimize' fires after the fact and preventDefault is unreliable, so I hide the already-minimized window instead.
   w.on('minimize', () => {
     if (!quitting && s().window.minimizeToTray) toTray()
   })
@@ -262,7 +262,7 @@ function makeDashboard(): BrowserWindow {
   return w
 }
 
-// The main window and the region picker follow one flag; the overlay keeps its own (overlay.protect).
+// I tie the main window and the region picker to one flag; the overlay keeps its own (overlay.protect).
 function applyWindowProtection(): void {
   const want = s().window.protectFromCapture && displayProtectionSupported()
   if (dashboard && !dashboard.isDestroyed()) dashboard.setContentProtection(want)
@@ -281,7 +281,7 @@ function startSession(mode: 'practice' | 'live' | 'meeting'): string {
   return id
 }
 
-// A cold local model costs 20–60 s on its first request; load it while the user is still settling in.
+// A cold local model costs 20–60 s on its first request, so I load it while the user is still settling in.
 function warmLocalModel(): void {
   const t = registry.resolve('quick_answer', s())
   if (!t?.isLocal) return
@@ -294,7 +294,7 @@ function warmLocalModel(): void {
   ).catch(() => {})
 }
 
-// whisper-server holds ~300 MB; keep it briefly for a quick restart, then give the memory back.
+// whisper-server holds ~300 MB; I keep it briefly for a quick restart, then give the memory back.
 let asrIdleTimer: ReturnType<typeof setTimeout> | undefined
 function scheduleAsrIdleStop(): void {
   clearTimeout(asrIdleTimer)
@@ -350,7 +350,7 @@ const SHORTCUT_ACTIONS: Record<ShortcutAction, () => void> = {
   panic
 }
 
-/** RegisterHotKey-based: no keyboard hook is installed, nothing to leak if the app crashes (FR-O05). */
+/** I register OS hotkeys, not a keyboard hook, so nothing can leak if the app crashes (FR-O05). */
 function registerShortcuts(): void {
   globalShortcut.unregisterAll()
   shortcutConflicts.length = 0
@@ -467,7 +467,7 @@ function refreshTray(): void {
 function lockDownSessions(): void {
   const dev = process.env.ELECTRON_RENDERER_URL
   const devOrigin = dev ? new URL(dev).origin : null
-  // The UI never talks to the network: provider calls go through main → NetGuard only.
+  // I never let the UI touch the network: provider calls go through main → NetGuard only.
   session.defaultSession.webRequest.onBeforeRequest((details, cb) => {
     const u = details.url
     const allowed =
@@ -486,7 +486,7 @@ function lockDownSessions(): void {
   session.defaultSession.setDisplayMediaRequestHandler(
     (_req, cb) => {
       void desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
-        // Only the audio loopback is used; the video track is stopped immediately in the renderer.
+        // I use only the audio loopback; the renderer stops the video track immediately.
         cb(sources[0] ? { video: sources[0], audio: 'loopback' } : {})
       })
     },

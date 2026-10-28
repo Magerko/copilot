@@ -16,7 +16,7 @@ export function Onboarding({ ctx, asr }: { ctx: Ctx; asr: AsrStatus | null }) {
   const started = useState(() => Date.now())[0]
   const next = () => setStep((s) => Math.min(STEPS.length - 1, s + 1))
   const back = () => setStep((s) => Math.max(0, s - 1))
-  // Capture consent is the user's explicit «Далее» on the audio step, for exactly the sources left switched on; «Пропустить» grants nothing.
+  // I take capture consent from the user's explicit «Далее» on the audio step, for exactly the sources left switched on; «Пропустить» grants nothing.
   const accept = async () => {
     if (step === 1) await ctx.patch({ consent: { mic: ctx.settings.audio.captureMic, system: ctx.settings.audio.captureSystem } })
     next()

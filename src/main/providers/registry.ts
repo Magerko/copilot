@@ -27,7 +27,7 @@ export class ProviderRegistry {
   private adapters = new Map<string, ProviderAdapter>()
   private modelCache = new Map<string, { at: number; models: ModelInfo[] }>()
   readonly visionOk = new Map<string, boolean>()
-  /** Last real outcome per provider/model (test or live answer): the LLM status is green only after one succeeded. */
+  /** Last real outcome per provider/model (test or live answer): I show the LLM status green only after one succeeded. */
   readonly textOk = new Map<string, boolean>()
 
   constructor(
@@ -94,7 +94,7 @@ export class ProviderRegistry {
     return { cfg, model: t.model, adapter, isLocal: isLocalTarget(cfg.baseUrl, t.model) }
   }
 
-  /** Only providers the user explicitly marked as allowed fallbacks (FR-P05). */
+  /** I use only providers the user explicitly marked as allowed fallbacks (FR-P05). */
   fallback(role: ModelRole, exclude: string, settings: Settings): ResolvedTarget | null {
     for (const r of [role, 'quick_answer', 'deep_answer'] as ModelRole[]) {
       const t = settings.roles[r]

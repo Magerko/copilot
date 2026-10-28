@@ -15,7 +15,7 @@ export function unregisterSecret(value: string): void {
   known.delete(value)
 }
 
-/** Applied to everything that leaves the process as text: logs, diagnostics, exports, error details. */
+/** I apply this to everything that leaves the process as text: logs, diagnostics, exports, error details. */
 export function redact(text: string): string {
   let out = text
   for (const s of known) out = out.split(s).join('[secret]')

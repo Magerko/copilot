@@ -50,7 +50,7 @@ interface Inflight {
   questionId: string
   revision: number
   kind: AnswerKind
-  /** Frees the budget slot now: abort() settles asynchronously, and a replacement request starts in the same tick. */
+  /** I free the budget slot now: abort() settles asynchronously, and a replacement request starts in the same tick. */
   release: () => void
 }
 
@@ -135,7 +135,7 @@ export class SessionManager {
     this.cancelAll()
     if (this.persist) this.d.db.endSession(this.snap.sessionId)
     Object.assign(this.snap, { sessionId: null, state: 'stopped', listening: false, partial: {}, candidates: [] })
-    // Capture statuses come from the renderer only while it captures; after stop nothing would reset them.
+    // Capture statuses come from the renderer only while it captures; after stop nothing else would reset them, so I do it here.
     this.snap.status.mic = OFF
     this.snap.status.system = OFF
     this.snap.levels = { user: 0, remote: 0 }
@@ -159,7 +159,7 @@ export class SessionManager {
     this.d.emit()
   }
 
-  /** Emergency stop: every stream and request ends now. */
+  /** Emergency stop: I end every stream and request now. */
   panic(): void {
     this.cancelAll()
     this.stop()
@@ -184,8 +184,6 @@ export class SessionManager {
     this.d.emit()
   }
 
-  // Transcript
-
   onSegment(seg: TranscriptSegment): void {
     if (!this.coord || !this.snap.listening || seg.sessionId !== this.snap.sessionId) return
     if (!seg.isFinal) {
@@ -206,8 +204,6 @@ export class SessionManager {
     if (this.persist) this.d.db.addSegment(seg)
     this.handle(this.coord.onUtterance({ source: seg.source, text: seg.text, startMs: seg.startMs, endMs: seg.endMs }), 'auto')
   }
-
-  // Commands
 
   answerNow(kind: AnswerKind = 'say', trigger: 'manual' | 'hotkey' = 'manual'): void {
     if (!this.coord) return
@@ -262,8 +258,6 @@ export class SessionManager {
     this.syncQuestions()
     this.generate(decision.question, ['screen'], { image, ocrText, task, withCode, codeLang })
   }
-
-  // Internals
 
   private handle(dec: Decision, via: 'auto' | 'manual'): void {
     const s = this.d.settings()
@@ -335,7 +329,7 @@ export class SessionManager {
     this.inflight.clear()
   }
 
-  /** Say-it first; points start once say has its first token, so the long answer never delays the short one. */
+  /** Say-it first; I start points once say has its first token, so the long answer never delays the short one. */
   private generate(
     q: QuestionEvent,
     kinds: AnswerKind[],
@@ -493,7 +487,7 @@ export class SessionManager {
           return
         }
         const candidate = !fellBack && !text && ['timeout', 'server', 'rate_limit', 'network'].includes(err.code) ? this.d.fallback(role, target.cfg.id) : null
-        // The cloud consent gate applies to the fallback too: a local failure must not leak CV and transcript to the cloud.
+        // I apply the cloud consent gate to the fallback too: a local failure must not leak CV and transcript to the cloud.
         const now = this.d.settings()
         const fb = candidate && (candidate.isLocal || (now.consent.cloud && !now.offline)) ? candidate : null
         this.d.outcome?.(target.cfg.id, target.model, false)

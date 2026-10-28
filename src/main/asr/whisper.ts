@@ -98,7 +98,7 @@ export class WhisperSidecar {
         const r = await this.fetch(`http://127.0.0.1:${this.port}/`, { signal: AbortSignal.timeout(1000) })
         if (r.status < 500) return
       } catch {
-        // not listening yet
+        // server not up yet — keep polling
       }
       await new Promise((r) => setTimeout(r, 200))
     }

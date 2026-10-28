@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { AppSnapshot, AsrStatus, Settings } from '@shared/types'
 import { km } from './api'
 
-// Seed arrives asynchronously (km:getState); a later seed must not clobber a newer push.
+// The seed arrives asynchronously (km:getState), so I keep a later seed from clobbering a newer push.
 function useFeed<T>(initial: T | null, subscribe: (cb: (v: T) => void) => () => void): [T | null, (v: T) => void] {
   const [v, setV] = useState(initial)
   useEffect(() => {

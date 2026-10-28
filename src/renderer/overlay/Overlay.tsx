@@ -47,7 +47,7 @@ export function Overlay() {
   const expandedNow = settings?.overlay.expanded ?? false
   const ready = !!(snap && settings)
 
-  // Compact mode follows the content so the answer is never silently cut off; expanded keeps the user's size.
+  // I make compact mode follow the content so the answer is never silently cut off; expanded keeps the user's size.
   useEffect(() => {
     const el = inner.current
     if (!el || expandedNow) return

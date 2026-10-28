@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { FetchFn } from '../providers/adapter'
 
-// Pinned to a commit with known hashes: a moving branch could change the data under the same name.
+// I pin to a commit with known hashes: a moving branch could change the data under the same name.
 const TESSDATA = 'https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/87416418657359cb625c412a48b6e1d6d41c29bd'
 const SHA256: Record<string, string> = {
   eng: '7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2',
@@ -14,7 +14,7 @@ const LANGS = Object.keys(SHA256)
 
 type Worker = { recognize(img: Buffer): Promise<{ data: { text: string } }>; terminate(): Promise<unknown> }
 
-/** Local OCR fallback for models without vision (FR-V06). Language data is downloaded once, then works offline. */
+/** Local OCR fallback for models without vision (FR-V06). I download the language data once, then it works offline. */
 export class Ocr {
   private worker: Worker | null = null
 

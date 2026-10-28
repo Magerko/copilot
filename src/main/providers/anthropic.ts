@@ -53,7 +53,7 @@ export class AnthropicAdapter implements ProviderAdapter {
           : m.content
       }))
     const params: Record<string, unknown> = { model: req.model, max_tokens: req.maxTokens, system, messages }
-    // Quick answers are latency-critical: low effort keeps thinking short on models where it cannot be disabled.
+    // Quick answers are latency-critical, so I keep thinking short with low effort on models where it can't be disabled.
     if (!NO_EFFORT.test(req.model)) params.output_config = { effort: req.maxTokens <= 400 ? 'low' : 'medium' }
     if (FALLBACK_MODELS.test(req.model)) {
       params.betas = ['server-side-fallback-2026-07-01']

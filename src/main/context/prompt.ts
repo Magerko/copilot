@@ -22,7 +22,7 @@ export interface BuiltPrompt {
   stats: { knowledgeChars: number; transcriptChars: number; droppedChunks: number }
 }
 
-// Character budgets (~3.5 chars/token): the prompt must not grow over a 90-minute call (FR-C04, FR-S08).
+// Character budgets (~3.5 chars/token): I keep the prompt from growing over a 90-minute call (FR-C04, FR-S08).
 const BUDGETS: Record<AnswerKind, { knowledge: number; transcript: number; earlier: number; maxTokens: number }> = {
   say: { knowledge: 1800, transcript: 1200, earlier: 300, maxTokens: 220 },
   points: { knowledge: 2400, transcript: 1600, earlier: 400, maxTokens: 360 },
@@ -68,7 +68,7 @@ export function detectLang(text: string): Lang {
   return 'en'
 }
 
-/** Content from documents/transcript/screen is wrapped in tags and declared data, never instructions (FR-C06). */
+/** I wrap content from documents/transcript/screen in tags and declare it data, never instructions (FR-C06). */
 function fence(s: string): string {
   // NFKC folds full-width ＜／＞ into ASCII so look-alike tags are caught too; models also accept "</ cv>".
   return s.normalize('NFKC').replace(/<\s*\/?\s*(cv|job|notes|transcript|screen|earlier_questions|question|system)\b[^>]*>/gi, '')

@@ -33,5 +33,5 @@ export type KmBridge = typeof api
 
 contextBridge.exposeInMainWorld('km', api)
 
-// CSP stops renderer requests before webRequest sees them; report them so the network log stays complete.
+// CSP stops renderer requests before webRequest sees them, so I report them to keep the network log complete.
 document.addEventListener('securitypolicyviolation', (e) => ipcRenderer.send('km:csp', { url: e.blockedURI, directive: e.effectiveDirective }))

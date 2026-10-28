@@ -4,7 +4,7 @@ import { km } from './api'
 const RATE = 16000
 const FRAME = 320 // 20 ms
 
-// Inline worklet: loading it from a Blob keeps the build single-file and CSP-checked.
+// I inline the worklet and load it from a Blob to keep the build single-file and CSP-checked.
 const WORKLET = `
 class Pcm extends AudioWorkletProcessor {
   constructor() { super(); this.buf = new Float32Array(${FRAME}); this.n = 0 }
@@ -102,7 +102,7 @@ export class Vad {
     return rms
   }
 
-  /** Flush on pause/stop so the last words are not lost. */
+  /** I flush on pause/stop so the last words are not lost. */
   flush(): void {
     if (this.active) this.finish(false)
   }

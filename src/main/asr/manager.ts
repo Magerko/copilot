@@ -30,7 +30,7 @@ export interface AsrEvents {
 const LANGS = new Set(['ru', 'uk', 'en'])
 
 /**
- * Serializes work for the single whisper-server. Finals are never dropped; a partial is
+ * I serialize work for the single whisper-server. I never drop finals; a partial is
  * superseded by any newer partial or final of the same utterance, so the queue cannot grow.
  */
 export class AsrManager {
@@ -114,7 +114,7 @@ export class AsrManager {
       await this.sidecar.start()
       this.st = { ...this.st, error: null }
       this.refreshStatus()
-      // GPU builds pay 13–27 s on the first request (spike S2); warm up before the user speaks.
+      // GPU builds pay 13–27 s on the first request (spike S2), so I warm it up before the user speaks.
       void this.sidecar.transcribe(new Int16Array(16000), 'en', '').catch(() => {})
       return true
     } catch (e) {

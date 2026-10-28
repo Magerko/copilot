@@ -3,7 +3,7 @@ import { extname } from 'node:path'
 
 const MAX_BYTES = 15 * 1024 * 1024
 
-/** Local-only text extraction (FR-C01): nothing leaves the machine during import. */
+/** I extract text locally only (FR-C01): nothing leaves the machine during import. */
 export async function extractText(filePath: string): Promise<string> {
   const st = await stat(filePath)
   if (st.size > MAX_BYTES) throw new Error('Файл больше 15 МБ')

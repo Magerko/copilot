@@ -68,7 +68,7 @@ export class Db {
     this.sql.close()
   }
 
-  /** Sessions left 'active' by a crash become 'interrupted'; their transcript is already on disk (WAL). */
+  /** I mark sessions left 'active' by a crash as 'interrupted'; their transcript is already on disk (WAL). */
   recoverInterrupted(): number {
     return Number(this.sql.prepare("UPDATE sessions SET status='interrupted', ended_at=COALESCE(ended_at, ?) WHERE status='active'").run(Date.now()).changes)
   }
@@ -197,8 +197,6 @@ export class Db {
   private purgeWal(): void {
     this.sql.exec('PRAGMA wal_checkpoint(TRUNCATE)')
   }
-
-  // Profiles & knowledge
 
   listProfiles(): Profile[] {
     return (this.sql.prepare('SELECT * FROM profiles ORDER BY name').all() as Row[]).map((r) => ({

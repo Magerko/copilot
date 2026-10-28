@@ -21,7 +21,7 @@ export interface UrlCheck {
   error?: string
 }
 
-/** HTTP outside loopback is allowed with a warning: LAN vLLM/LiteLLM setups are a real use case. */
+/** I allow HTTP outside loopback with a warning: LAN vLLM/LiteLLM setups are a real use case. */
 export function checkEndpoint(raw: string): UrlCheck {
   let u: URL
   try {
@@ -64,7 +64,7 @@ export class NetGuard {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
     this.assertAllowed(url)
     if (init?.redirect === 'manual' || init?.redirect === 'error') return globalThis.fetch(input, init)
-    // Redirects are followed here, hop by hop, so a loopback endpoint cannot bounce an offline request to the internet.
+    // I follow redirects here, hop by hop, so a loopback endpoint cannot bounce an offline request to the internet.
     let current = url
     let opts: RequestInit = { ...init, redirect: 'manual' }
     for (let hop = 0; hop < 5; hop++) {
