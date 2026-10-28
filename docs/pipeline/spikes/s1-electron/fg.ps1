@@ -1,0 +1,1 @@
+Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();' -Name W -Namespace U; [U.W]::GetForegroundWindow().ToInt64()

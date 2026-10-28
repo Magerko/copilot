@@ -1,0 +1,59 @@
+body {
+  background: #000;
+}
+.pk {
+  position: fixed;
+  inset: 0;
+  user-select: none;
+}
+.pk-img {
+  position: absolute;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: fill;
+  pointer-events: none;
+}
+.pk-shade {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.pk-sel {
+  position: absolute;
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+.pk-blur {
+  position: absolute;
+  background: rgba(122, 122, 122, 0.92);
+  border: 1px dashed #fff;
+  pointer-events: none;
+}
+.pk-help {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.pk-bar {
+  position: absolute;
+  width: 460px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  cursor: default;
+}
+.pk-loading {
+  color: #888;
+  padding: 20px;
+}

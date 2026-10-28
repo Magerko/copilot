@@ -1,0 +1,18 @@
+{
+    "name":  "s1-electron",
+    "version":  "1.0.0",
+    "description":  "",
+    "main":  "main.js",
+    "scripts":  {
+                    "test":  "echo \"Error: no test specified\" \u0026\u0026 exit 1"
+                },
+    "keywords":  [
+
+                 ],
+    "author":  "",
+    "license":  "ISC",
+    "type":  "commonjs",
+    "dependencies":  {
+                         "electron":  "^45.1.0"
+                     }
+}

@@ -1,0 +1,75 @@
+{
+  "name": "kairos-m",
+  "productName": "Kairos M",
+  "version": "0.1.0",
+  "description": "Local-first AI interview & meeting copilot (BYOK)",
+  "main": "out/main/index.js",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "dist": "electron-vite build && electron-builder --win nsis",
+    "icon": "node scripts/make-icon.ts",
+    "dist:dir": "electron-vite build && electron-builder --win dir"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
+    "mammoth": "^1.13.0",
+    "pdfjs-dist": "^5.7.284",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "45.1.0",
+    "electron-builder": "^26.18.0",
+    "electron-vite": "^6.0.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0",
+    "vitest": "^5.0.5"
+  },
+  "author": "Kairos M",
+  "build": {
+    "appId": "app.kairos-m",
+    "productName": "Kairos M",
+    "directories": {
+      "output": "release",
+      "buildResources": "resources"
+    },
+    "files": [
+      "out/**",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/tesseract.js/**",
+      "node_modules/tesseract.js-core/**"
+    ],
+    "win": {
+      "icon": "resources/icon.ico",
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Kairos M",
+      "deleteAppDataOnUninstall": false
+    },
+    "electronLanguages": [
+      "ru",
+      "uk",
+      "en-US"
+    ]
+  },
+  "license": "MIT"
+}

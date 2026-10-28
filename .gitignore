@@ -1,0 +1,17 @@
+node_modules/
+out/
+dist/
+release/
+resources/bin/
+*.db
+*.db-*
+.env*
+!.env.example
+docs/pipeline/spikes/**/node_modules/
+
+# IDE
+.idea/
+
+# Внутренние документы (не для публичного репо)
+*.docx
+!tests/fixtures/*.docx
