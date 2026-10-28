@@ -1,5 +1,7 @@
 # Kairos M
 
+[![CI](https://github.com/Magerko/kairos-m/actions/workflows/ci.yml/badge.svg)](https://github.com/Magerko/kairos-m/actions/workflows/ci.yml)
+
 Локальный помощник для собеседований и встреч на Windows. Слушает разговор, вовремя замечает вопрос
 и показывает в маленьком окне короткий ответ — с опорой на ваше резюме и описание вакансии.
 
