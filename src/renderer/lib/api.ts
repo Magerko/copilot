@@ -10,6 +10,7 @@ import type {
   Profile,
   ProviderConfig,
   ProviderPreset,
+  ResumableSession,
   ScreenTask,
   SessionSummary,
   Settings
@@ -52,6 +53,7 @@ export interface InitialState {
   presets: Record<ProviderPreset, PresetInfo>
   asr: AsrStatus
   preview: OutgoingPreview
+  resumable: ResumableSession | null
   version: string
 }
 
@@ -76,6 +78,7 @@ export const api = {
   },
   session: {
     start: (mode: 'practice' | 'live' | 'meeting') => call<string>('km:session:start', mode),
+    resume: () => call<string | null>('km:session:resume'),
     stop: () => call<void>('km:session:stop'),
     toggleListen: () => call<void>('km:session:toggleListen'),
     answerNow: (kind?: AnswerKind) => call<void>('km:session:answerNow', kind),

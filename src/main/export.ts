@@ -13,7 +13,7 @@ function ts(ms: unknown): string {
 
 export function exportSession(d: { session: Row | undefined; segments: Row[]; questions: Row[]; answers: Row[] }, fmt: 'md' | 'json'): string {
   if (!d.session) throw new Error('Сессия не найдена')
-  if (fmt === 'json') return redact(JSON.stringify({ format: 'kairos-m/session@1', ...d }, null, 2))
+  if (fmt === 'json') return redact(JSON.stringify({ format: 'copilot/session@1', ...d }, null, 2))
 
   const latest = new Map<string, Row>()
   for (const q of d.questions) latest.set(String(q.id), q)

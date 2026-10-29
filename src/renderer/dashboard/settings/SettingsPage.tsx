@@ -133,7 +133,7 @@ function OverlayTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
           on={ctx.settings.window.protectFromCapture}
           onChange={(v) => void ctx.patch({ window: { protectFromCapture: v } })}
           label="Скрывать из захвата и главное окно, и выбор области"
-          hint="Тот же флаг Windows. Если на звонке попросят показать экран, окна Kairos M не попадут в поток — но вы их видите. Не гарантия: зависит от программы захвата."
+          hint="Тот же флаг Windows. Если на звонке попросят показать экран, окна Copilot не попадут в поток — но вы их видите. Не гарантия: зависит от программы захвата."
         />
       </Section>
 
@@ -143,6 +143,12 @@ function OverlayTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
           onChange={(v) => void ctx.patch({ window: { minimizeToTray: v } })}
           label="Сворачивать в трей при закрытии и сворачивании"
           hint="Окно прячется в значок рядом с часами, приложение и сессия продолжают работать. Полный выход — через меню значка в трее."
+        />
+        <Toggle
+          on={ctx.settings.window.panicQuits}
+          onChange={(v) => void ctx.patch({ window: { panicQuits: v } })}
+          label="Аварийная остановка полностью закрывает приложение"
+          hint="По умолчанию аварийная остановка только глушит захват и прячет подсказки, а приложение остаётся в трее. С этой опцией — приложение полностью завершается (процесса не остаётся)."
         />
       </Section>
     </div>
@@ -258,7 +264,7 @@ function PrivacyTab({ ctx }: { ctx: Ctx }) {
       </Section>
       <Section title="Данные">
         <div className="small">
-          История, транскрипты и индексы документов лежат в SQLite в <span className="mono">%APPDATA%\kairos-m</span>. Ключи — в отдельном файле, зашифрованном
+          История, транскрипты и индексы документов лежат в SQLite в <span className="mono">%APPDATA%\copilot</span>. Ключи — в отдельном файле, зашифрованном
           Windows (DPAPI). Сырое аудио не сохраняется.
         </div>
         <div className="small muted">

@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite'
-import type { AnswerEvent, KnowledgeDoc, Profile, QuestionEvent, SessionSummary, TranscriptSegment } from '@shared/types'
+import type { AnswerEvent, KnowledgeDoc, Profile, QuestionEvent, ResumableSession, SessionSummary, Source, TranscriptSegment } from '@shared/types'
 import type { Chunk } from '../context/retrieval'
 
 const MIGRATIONS: string[] = [
@@ -171,6 +171,39 @@ export class Db {
       questions: this.sql.prepare('SELECT * FROM questions WHERE session_id=? ORDER BY created_at, revision').all(id) as Row[],
       answers: this.sql.prepare("SELECT * FROM answers WHERE session_id=? AND status IN ('done','error','cancelled') ORDER BY created_at").all(id) as Row[]
     }
+  }
+
+  /** The most recent finished session that has any transcript — the one "Continue previous session" picks up. */
+  lastResumable(): ResumableSession | null {
+    const r = this.sql
+      .prepare(
+        `SELECT s.*, (SELECT COUNT(*) FROM transcript_segments t WHERE t.session_id=s.id) AS segs
+         FROM sessions s WHERE s.status!='active' ORDER BY COALESCE(s.ended_at, s.started_at) DESC LIMIT 1`
+      )
+      .get() as Row | undefined
+    if (!r || Number(r.segs) === 0) return null
+    return {
+      id: String(r.id),
+      title: String(r.title ?? ''),
+      startedAt: Number(r.started_at),
+      endedAt: r.ended_at == null ? null : Number(r.ended_at),
+      mode: (String(r.mode ?? 'live') as ResumableSession['mode']) || 'live',
+      interrupted: r.status === 'interrupted',
+      segments: Number(r.segs)
+    }
+  }
+
+  sessionSegments(id: string): TranscriptSegment[] {
+    return (this.sql.prepare('SELECT * FROM transcript_segments WHERE session_id=? ORDER BY start_ms').all(id) as Row[]).map((r) => ({
+      sessionId: String(r.session_id),
+      segmentId: String(r.id),
+      source: r.source as Source,
+      startMs: Number(r.start_ms),
+      endMs: Number(r.end_ms),
+      text: String(r.text),
+      isFinal: true,
+      lang: r.lang == null ? null : String(r.lang)
+    }))
   }
 
   deleteSession(id: string): void {

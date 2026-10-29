@@ -1,6 +1,6 @@
 {
-  "name": "kairos-m",
-  "productName": "Kairos M",
+  "name": "copilot",
+  "productName": "Copilot",
   "version": "0.1.0",
   "description": "Local-first AI interview & meeting copilot (BYOK)",
   "main": "out/main/index.js",
@@ -32,15 +32,14 @@
     "electron-vite": "^6.0.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "resedit": "1.7.2",
     "typescript": "^5.9.3",
     "vite": "^8.0.0",
     "vitest": "^5.0.5"
   },
-  "author": "Kairos M",
+  "author": "Copilot",
   "build": {
-    "appId": "app.kairos-m",
-    "productName": "Kairos M",
+    "appId": "app.copilot",
+    "productName": "Copilot",
     "directories": {
       "output": "release",
       "buildResources": "resources"
@@ -61,20 +60,20 @@
       }
     ],
     "win": {
-      "executableName": "Kairos M",
+      "executableName": "Copilot",
       "icon": "resources/icon.ico",
       "target": [
         "nsis"
       ]
     },
     "nsis": {
-      "artifactName": "Kairos M Setup ${version}.${ext}",
-      "uninstallDisplayName": "Kairos M",
+      "artifactName": "Copilot Setup ${version}.${ext}",
+      "uninstallDisplayName": "Copilot",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "Kairos M",
+      "shortcutName": "Copilot",
       "deleteAppDataOnUninstall": false
     },
     "electronLanguages": [

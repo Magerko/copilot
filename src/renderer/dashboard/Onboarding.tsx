@@ -28,11 +28,9 @@ export function Onboarding({ ctx, asr }: { ctx: Ctx; asr: AsrStatus | null }) {
         <div className="row between">
           <div className="brand">
             <span className="brand-mark">
-              M<i />
+              C<i />
             </span>
-            <span>
-              Kairos <b>M</b>
-            </span>
+            <span>Copilot</span>
           </div>
           <span className="faint small">
             Шаг {step + 1} из {STEPS.length}
@@ -82,7 +80,7 @@ export function Onboarding({ ctx, asr }: { ctx: Ctx; asr: AsrStatus | null }) {
 function StepLang({ ctx }: { ctx: Ctx }) {
   return (
     <div className="col" style={{ gap: 16 }}>
-      <h1>{t('Добро пожаловать в Kairos M')}</h1>
+      <h1>{t('Добро пожаловать в Copilot')}</h1>
       <p className="muted" style={{ margin: 0 }}>
         Помощник слушает разговор, вовремя замечает вопрос и показывает короткий ответ с опорой на ваше резюме. Распознавание речи — на этом компьютере, модель
         для ответов вы выбираете сами.
@@ -357,8 +355,8 @@ function StepConsent({ ctx, started }: { ctx: Ctx; started: number }) {
     <div className="col" style={{ gap: 14 }}>
       <h2>Последнее: согласие и честность</h2>
       <div className="banner">
-        Записывать звук и использовать AI-подсказки можно только там, где это разрешено правилами и участники согласны. Kairos M не обходит прокторинг и
-        средства контроля и не обещает невидимости.
+        Записывать звук и использовать AI-подсказки можно только там, где это разрешено правилами и участники согласны. Copilot не обходит прокторинг и средства
+        контроля и не обещает невидимости.
       </div>
       <Toggle
         on={c.history}

@@ -60,31 +60,40 @@ function segDist(px: number, py: number, ax: number, ay: number, bx: number, by:
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy))
 }
 
-/** App mark: a single «M» stroke on a deep ink tile with an amber "moment" dot. */
+/** App mark: a forward double-chevron (amber over white) on a deep ink tile. */
 export function appIcon(size: number): Buffer {
   const s = size
   const r = s * 0.22
-  const stroke = s * 0.085
-  const pts: [number, number][] = [
-    [0.24, 0.74],
-    [0.24, 0.3],
-    [0.5, 0.58],
-    [0.76, 0.3],
-    [0.76, 0.74]
-  ].map(([x, y]) => [x * s, y * s])
+  const stroke = s * 0.1
+  const chev = (rows: number[][]): [number, number][] => rows.map(([x, y]) => [x * s, y * s])
+  const top = chev([
+    [0.28, 0.5],
+    [0.5, 0.32],
+    [0.72, 0.5]
+  ])
+  const bot = chev([
+    [0.28, 0.68],
+    [0.5, 0.5],
+    [0.72, 0.68]
+  ])
+  const dmin = (x: number, y: number, pts: [number, number][]): number => {
+    let d = Infinity
+    for (let i = 0; i < pts.length - 1; i++) d = Math.min(d, segDist(x, y, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]))
+    return d
+  }
+  const bg: [number, number, number] = [22, 26, 34]
+  const amber: [number, number, number] = [245, 166, 35]
+  const white: [number, number, number] = [236, 238, 242]
   return makePng(s, s, (x, y) => {
     const cx = Math.min(Math.max(x, r), s - r)
     const cy = Math.min(Math.max(y, r), s - r)
-    const inTile = Math.hypot(x - cx, y - cy) <= r
-    if (!inTile) return [0, 0, 0, 0]
-    const dot = Math.hypot(x - 0.5 * s, y - 0.2 * s) <= s * 0.065
-    if (dot) return [245, 166, 35, 255]
-    let d = Infinity
-    for (let i = 0; i < pts.length - 1; i++) d = Math.min(d, segDist(x, y, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]))
-    const a = Math.max(0, Math.min(1, stroke / 2 + 0.5 - d))
-    const bg: [number, number, number] = [22, 26, 34]
-    const fg: [number, number, number] = [236, 238, 242]
-    return [bg[0] + (fg[0] - bg[0]) * a, bg[1] + (fg[1] - bg[1]) * a, bg[2] + (fg[2] - bg[2]) * a, 255]
+    if (Math.hypot(x - cx, y - cy) > r) return [0, 0, 0, 0]
+    const aBot = Math.max(0, Math.min(1, stroke / 2 + 0.5 - dmin(x, y, bot)))
+    const aTop = Math.max(0, Math.min(1, stroke / 2 + 0.5 - dmin(x, y, top)))
+    // The amber (upper) chevron wins where the two overlap.
+    const col = aTop > 0 ? amber : white
+    const a = Math.max(aBot, aTop)
+    return [bg[0] + (col[0] - bg[0]) * a, bg[1] + (col[1] - bg[1]) * a, bg[2] + (col[2] - bg[2]) * a, 255]
   })
 }
 

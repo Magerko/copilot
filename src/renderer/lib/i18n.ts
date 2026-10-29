@@ -8,6 +8,7 @@ export function setLang(l: UiLang): void {
 
 // I use the Russian text as the key; missing translations fall back to it.
 const DICT: Record<string, [uk: string, en: string]> = {
+  'Продолжить прошлую сессию': ['Продовжити минулу сесію', 'Resume previous session'],
   Главная: ['Головна', 'Home'],
   Сессия: ['Сесія', 'Session'],
   История: ['Історія', 'History'],
@@ -57,7 +58,7 @@ const DICT: Record<string, [uk: string, en: string]> = {
   Отмена: ['Скасувати', 'Cancel'],
   'Аварийная остановка': ['Аварійна зупинка', 'Emergency stop'],
   'Цена неизвестна': ['Ціна невідома', 'Price unknown'],
-  'Добро пожаловать в Kairos M': ['Ласкаво просимо до Kairos M', 'Welcome to Kairos M'],
+  'Добро пожаловать в Copilot': ['Ласкаво просимо до Copilot', 'Welcome to Copilot'],
   Язык: ['Мова', 'Language'],
   Звук: ['Звук', 'Audio'],
   Модель: ['Модель', 'Model'],

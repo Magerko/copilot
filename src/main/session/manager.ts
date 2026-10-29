@@ -132,6 +132,21 @@ export class SessionManager {
     return id
   }
 
+  /** Continue a prior session: start fresh, then preload its transcript so the conversation keeps its context. */
+  continuePrevious(prior: TranscriptSegment[], mode: 'practice' | 'live' | 'meeting'): string {
+    const id = this.start({ mode })
+    const recent = prior.slice(-300)
+    if (recent.length) {
+      // The old timestamps are on the old session's clock; I rebase them to just-before-now so they fall in the context window.
+      const shift = -1000 - recent[recent.length - 1].endMs
+      this.finals = recent.map((f) => ({ ...f, sessionId: id, startMs: f.startMs + shift, endMs: f.endMs + shift }))
+      this.snap.segments = this.finals.slice(-40)
+    }
+    this.snap.notice = 'Продолжена прошлая сессия — контекст восстановлен.'
+    this.d.emit()
+    return id
+  }
+
   stop(): void {
     if (!this.snap.sessionId) return
     this.cancelAll()

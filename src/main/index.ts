@@ -15,7 +15,7 @@ import {
   Tray
 } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type {
   AnswerKind,
@@ -52,9 +52,18 @@ import { SettingsStore } from './storage/settings'
 import { appIcon } from './util/png'
 import { createDashboard, createOverlay, createPicker, displayProtectionSupported, sanitizeBounds } from './windows/windows'
 
-app.setAppUserModelId('app.kairos-m')
+app.setAppUserModelId('app.copilot')
 // I keep runtime data outside OneDrive/Cyrillic paths: whisper.cpp opens model files with ANSI APIs.
-app.setPath('userData', join(app.getPath('appData'), 'kairos-m'))
+// The app was renamed kairos-m → copilot; I move the old data folder once so settings and models carry over.
+const dataHome = app.getPath('appData')
+const newData = join(dataHome, 'copilot')
+const oldData = join(dataHome, 'kairos-m')
+try {
+  if (!existsSync(newData) && existsSync(oldData)) renameSync(oldData, newData)
+} catch {
+  // a locked file aborts the move; fall back to whichever folder exists
+}
+app.setPath('userData', existsSync(newData) ? newData : oldData)
 // I key the lock by userData, so it has to come after setPath; app.quit() alone would leave this module
 // running, and a second instance would run migrations and mark the live session as interrupted.
 if (!app.requestSingleInstanceLock()) process.exit(0)
@@ -241,7 +250,7 @@ function makeDashboard(): BrowserWindow {
     // I nudge once so the window doesn't just "vanish" the first time.
     if (!trayHintShown && tray) {
       trayHintShown = true
-      tray.displayBalloon?.({ title: 'Kairos M', content: 'Свёрнуто в трей. Нажмите значок, чтобы открыть.' })
+      tray.displayBalloon?.({ title: 'Copilot', content: 'Свёрнуто в трей. Нажмите значок, чтобы открыть.' })
     }
   }
   w.on('close', (e) => {
@@ -270,8 +279,7 @@ function applyWindowProtection(): void {
   if (picker && !picker.isDestroyed()) picker.setContentProtection(want)
 }
 
-function startSession(mode: 'practice' | 'live' | 'meeting'): string {
-  const id = sessionMgr.start({ mode })
+function afterStart(id: string, mode: 'practice' | 'live' | 'meeting'): string {
   clearTimeout(asrIdleTimer)
   asr.resetSession()
   void asr.ensure()
@@ -280,6 +288,16 @@ function startSession(mode: 'practice' | 'live' | 'meeting'): string {
   if (mode !== 'meeting') showOverlay()
   refreshTray()
   return id
+}
+
+function startSession(mode: 'practice' | 'live' | 'meeting'): string {
+  return afterStart(sessionMgr.start({ mode }), mode)
+}
+
+function resumeSession(): string | null {
+  const r = db.lastResumable()
+  if (!r) return null
+  return afterStart(sessionMgr.continuePrevious(db.sessionSegments(r.id), r.mode), r.mode)
 }
 
 // A cold local model costs 20–60 s on its first request, so I load it while the user is still settling in.
@@ -333,6 +351,11 @@ function panic(): void {
   overlay?.hide()
   picker?.close()
   refreshTray()
+  // Opt-in: emergency stop leaves nothing running — the whole app quits after capture is down.
+  if (s().window.panicQuits) {
+    quitting = true
+    app.quit()
+  }
 }
 
 const SHORTCUT_ACTIONS: Record<ShortcutAction, () => void> = {
@@ -449,10 +472,10 @@ function outgoingPreview(): OutgoingPreview {
 function refreshTray(): void {
   if (!tray) return
   const active = sessionMgr.active
-  tray.setToolTip(active ? (sessionMgr.snap.listening ? 'Kairos M — слушает' : 'Kairos M — пауза') : 'Kairos M')
+  tray.setToolTip(active ? (sessionMgr.snap.listening ? 'Copilot — слушает' : 'Copilot — пауза') : 'Copilot')
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: 'Открыть Kairos M', click: showDashboard },
+      { label: 'Открыть Copilot', click: showDashboard },
       { label: 'Показать/скрыть подсказки', click: toggleOverlay },
       active
         ? { label: sessionMgr.snap.listening ? 'Пауза' : 'Продолжить', click: toggleListen }
@@ -524,6 +547,7 @@ function registerIpc(): void {
     presets: PRESETS,
     asr: asr.status,
     preview: outgoingPreview(),
+    resumable: db.lastResumable(),
     version: app.getVersion()
   }))
   handle('km:settings:patch', (p: DeepPartial<Settings>) => {
@@ -554,6 +578,7 @@ function registerIpc(): void {
   })
 
   handle('km:session:start', (mode: 'practice' | 'live' | 'meeting') => startSession(mode))
+  handle('km:session:resume', () => resumeSession())
   handle('km:session:stop', () => stopSession())
   handle('km:session:toggleListen', () => toggleListen())
   handle('km:session:answerNow', (kind?: AnswerKind) => sessionMgr.answerNow(kind ?? 'say', 'manual'))
@@ -670,7 +695,7 @@ function registerIpc(): void {
   handle('km:history:export', async (id: string, fmt: 'md' | 'json') => {
     const content = exportSession(db.sessionDetail(id), fmt)
     const r = await dialog.showSaveDialog(dashboard!, {
-      defaultPath: `kairos-session-${id.slice(0, 8)}.${fmt}`,
+      defaultPath: `copilot-session-${id.slice(0, 8)}.${fmt}`,
       filters: [{ name: fmt.toUpperCase(), extensions: [fmt] }]
     })
     if (r.canceled || !r.filePath) return null

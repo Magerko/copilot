@@ -64,7 +64,7 @@ export function App() {
     []
   )
 
-  if (!init || !settings || !snap) return <div className="boot">Kairos M…</div>
+  if (!init || !settings || !snap) return <div className="boot">Copilot…</div>
 
   const patch = async (p: Parameters<typeof api.patchSettings>[0]) => {
     setSettings(await api.patchSettings(p))
@@ -90,11 +90,9 @@ export function App() {
       <aside className="side">
         <div className="brand">
           <span className="brand-mark">
-            M<i />
+            C<i />
           </span>
-          <span>
-            Kairos <b>M</b>
-          </span>
+          <span>Copilot</span>
         </div>
         <nav>
           {nav.map(([p, label]) => (

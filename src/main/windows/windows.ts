@@ -26,7 +26,7 @@ export function createDashboard(): BrowserWindow {
     minWidth: 880,
     minHeight: 600,
     show: false,
-    title: 'Kairos M',
+    title: 'Copilot',
     backgroundColor: '#0f1115',
     autoHideMenuBar: true,
     // Audio capture lives in this renderer, so I keep it running while minimized to tray.
@@ -82,7 +82,7 @@ export function createOverlay(o: OverlaySettings): BrowserWindow {
     // I make it transparent so the panel background can be semi-see-through while the text stays fully opaque (CSS controls the alpha).
     transparent: true,
     backgroundColor: '#00000000',
-    title: 'Kairos M — подсказки',
+    title: 'Copilot — подсказки',
     webPreferences: { ...webPreferences, backgroundThrottling: false }
   })
   if (o.pinned) win.setAlwaysOnTop(true, 'screen-saver')

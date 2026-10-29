@@ -31,12 +31,12 @@ class FakeAdapter implements ProviderAdapter {
   }
 }
 
-function setup(opts: { local?: boolean; cloudConsent?: boolean; delayMs?: number; failLocal?: boolean; offline?: boolean } = {}) {
+function setup(opts: { local?: boolean; cloudConsent?: boolean; delayMs?: number; failLocal?: boolean; offline?: boolean; history?: boolean } = {}) {
   const settings: Settings = deepMerge(DEFAULT_SETTINGS, {
     autoAnswer: true,
-    history: false,
+    history: opts.history ?? false,
     offline: opts.offline ?? false,
-    consent: { cloud: opts.cloudConsent ?? false }
+    consent: { cloud: opts.cloudConsent ?? false, history: opts.history ?? false }
   })
   const cfg: ProviderConfig = {
     id: 'p',
@@ -63,9 +63,10 @@ function setup(opts: { local?: boolean; cloudConsent?: boolean; delayMs?: number
     }
   const profile: Profile = { id: 'default', name: 'Test', preset: 'backend', style: 'natural', notes: '' }
   let n = 0
+  const db = new Db(join(mkdtempSync(join(tmpdir(), 'km-mgr-')), 'k.db'))
   const mgr = new SessionManager({
     settings: () => settings,
-    db: new Db(join(mkdtempSync(join(tmpdir(), 'km-mgr-')), 'k.db')),
+    db,
     profile: () => profile,
     resolve: () => target,
     fallback: () => cloudTarget,
@@ -76,7 +77,7 @@ function setup(opts: { local?: boolean; cloudConsent?: boolean; delayMs?: number
     emit: () => {},
     log: () => {}
   })
-  return { mgr, adapter, cloud }
+  return { mgr, adapter, cloud, db }
 }
 
 async function until(cond: () => boolean, ms = 2000) {
@@ -170,6 +171,34 @@ describe('SessionManager', () => {
     const id = mgr.start({ mode: 'practice' })
     mgr.onSegment({ sessionId: id, segmentId: 'u', source: 'user', startMs: 0, endMs: 1000, text: 'что такое транзакция', isFinal: false, lang: null })
     expect(mgr.snap.partial.user).toBe('что такое транзакция')
+  })
+
+  it('continues a previous session: its transcript is restored into the new session', () => {
+    const { mgr, db } = setup({ history: true })
+    const id = mgr.start({ mode: 'live' })
+    mgr.onSegment({
+      sessionId: id,
+      segmentId: 's1',
+      source: 'remote',
+      startMs: 1000,
+      endMs: 3000,
+      text: 'что такое транзакция в базе данных',
+      isFinal: true,
+      lang: 'ru'
+    })
+    mgr.stop()
+
+    const r = db.lastResumable()
+    expect(r).not.toBeNull()
+    expect(r!.id).toBe(id)
+    expect(r!.segments).toBe(1)
+
+    const newId = mgr.continuePrevious(db.sessionSegments(r!.id), r!.mode)
+    expect(newId).not.toBe(id)
+    expect(mgr.snap.sessionId).toBe(newId)
+    expect(mgr.snap.segments.some((s) => s.text.includes('транзакция'))).toBe(true)
+    // the restored transcript is rebased to just-before-now so it lands in a new question's context window
+    expect(mgr.snap.segments[mgr.snap.segments.length - 1].endMs).toBeLessThanOrEqual(0)
   })
 
   it('rapid re-asking with default concurrency never blocks the newest question', async () => {

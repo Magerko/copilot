@@ -54,9 +54,20 @@ export function Home({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
                 </button>
               </>
             ) : (
-              <button className="btn primary big" disabled={noAsr && noModel} onClick={() => void api.session.start(mode)}>
-                {t('Начать сессию')}
-              </button>
+              <>
+                <button className="btn primary big" disabled={noAsr && noModel} onClick={() => void api.session.start(mode)}>
+                  {t('Начать сессию')}
+                </button>
+                {ctx.init.resumable && (
+                  <button
+                    className="btn big"
+                    title={`${ctx.init.resumable.title} · ${ctx.init.resumable.segments} реплик`}
+                    onClick={() => void api.session.resume().then(() => ctx.go('live'))}
+                  >
+                    {t('Продолжить прошлую сессию')}
+                  </button>
+                )}
+              </>
             )}
             <select
               className="input"

@@ -222,6 +222,8 @@ export interface WindowSettings {
   minimizeToTray: boolean
   /** Apply WDA_EXCLUDEFROMCAPTURE to the main window and region picker too, so a shared screen does not reveal them. */
   protectFromCapture: boolean
+  /** Emergency stop fully quits the app (process gone) instead of only stopping capture and hiding the overlay. */
+  panicQuits: boolean
 }
 
 export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
@@ -289,6 +291,16 @@ export interface SessionSummary {
   status: 'active' | 'ended' | 'interrupted'
   title: string
   questions: number
+}
+
+export interface ResumableSession {
+  id: string
+  title: string
+  startedAt: number
+  endedAt: number | null
+  mode: 'practice' | 'live' | 'meeting'
+  interrupted: boolean
+  segments: number
 }
 
 export interface AsrStatus {

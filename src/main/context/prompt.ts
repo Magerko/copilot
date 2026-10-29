@@ -79,7 +79,7 @@ export function buildPrompt(p: PromptInput): BuiltPrompt {
   const lang: Lang = p.answerLang === 'auto' ? detectLang(p.question) : p.answerLang
 
   const system = [
-    'You are Kairos M, a real-time interview and meeting copilot. You write what the user can say out loud right now.',
+    'You are Copilot, a real-time interview and meeting copilot. You write what the user can say out loud right now.',
     'Rules:',
     '- Give the actual answer in first person as the user. Never write meta-advice such as "you could mention" or "a good answer would be".',
     `- Personal facts (employers, projects, years, numbers, salaries, achievements) may come ONLY from the <cv>, <job> and <notes> blocks. If the needed fact is absent, do not invent it: answer from general knowledge or neutrally, and append ${NOT_IN_CV[lang]} when the question is about the user's own experience.`,
