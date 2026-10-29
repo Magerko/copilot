@@ -33,6 +33,7 @@ import type {
 } from '@shared/types'
 import { AsrAssets, type AsrBackend } from './asr/assets'
 import { AsrManager } from './asr/manager'
+import { SileroGate } from './asr/silero'
 import { BudgetManager } from './budget/budget'
 import { extractText } from './context/importers'
 import { chunkText } from './context/retrieval'
@@ -751,23 +752,31 @@ app.whenReady().then(() => {
       updateLlmStatus()
     }
   })
-  asr = new AsrManager(assets, guard.fetch, asrConfig(), {
-    segment: (seg) => sessionMgr.onSegment(seg),
-    status: (st) => {
-      sessionMgr.snap.status.asr = st.download
-        ? { state: 'busy', label: `загрузка ${st.download.name}: ${Math.round((st.download.received / Math.max(1, st.download.total)) * 100)}%` }
-        : st.error
-          ? { state: 'error', label: st.error }
-          : !st.binary || !st.modelPresent
-            ? { state: 'warn', label: 'не установлено' }
-            : st.running
-              ? { state: 'ok', label: `whisper ${st.model} · локально${st.lastLatencyMs ? ` · ${st.lastLatencyMs} мс` : ''}` }
-              : { state: 'ok', label: `whisper ${st.model} · установлен` }
-      broadcast('km:asr', st)
-      emit()
+  const sileroModel = app.isPackaged ? join(process.resourcesPath, 'silero_vad.onnx') : join(app.getAppPath(), 'resources', 'silero_vad.onnx')
+  const silero = new SileroGate(sileroModel, log)
+  asr = new AsrManager(
+    assets,
+    guard.fetch,
+    asrConfig(),
+    {
+      segment: (seg) => sessionMgr.onSegment(seg),
+      status: (st) => {
+        sessionMgr.snap.status.asr = st.download
+          ? { state: 'busy', label: `загрузка ${st.download.name}: ${Math.round((st.download.received / Math.max(1, st.download.total)) * 100)}%` }
+          : st.error
+            ? { state: 'error', label: st.error }
+            : !st.binary || !st.modelPresent
+              ? { state: 'warn', label: 'не установлено' }
+              : st.running
+                ? { state: 'ok', label: `whisper ${st.model} · локально${st.lastLatencyMs ? ` · ${st.lastLatencyMs} мс` : ''}` }
+                : { state: 'ok', label: `whisper ${st.model} · установлен` }
+        broadcast('km:asr', st)
+        emit()
+      },
+      log
     },
-    log
-  })
+    silero
+  )
   guard.onBlocked((url, reason) => log('blocked', { url, reason }))
   lockDownSessions()
   registerIpc()

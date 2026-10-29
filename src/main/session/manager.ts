@@ -86,6 +86,7 @@ export class SessionManager {
   private index: Bm25Index | null = null
   private startedAt = 0
   private persist = true
+  private answerUserSource = false
 
   constructor(private d: SessionDeps) {}
 
@@ -103,7 +104,8 @@ export class SessionManager {
     const s = this.d.settings()
     this.persist = s.history && s.consent.history
     this.startedAt = this.d.now()
-    this.coord = new QuestionCoordinator(id, { ...DEFAULT_COORDINATOR, answerUserSource: opts.mode === 'practice' }, this.d.newId)
+    this.answerUserSource = opts.mode === 'practice'
+    this.coord = new QuestionCoordinator(id, { ...DEFAULT_COORDINATOR, answerUserSource: this.answerUserSource }, this.d.newId)
     this.board.setActive(null)
     this.finals = []
     this.reloadKnowledge()
@@ -187,6 +189,8 @@ export class SessionManager {
   onSegment(seg: TranscriptSegment): void {
     if (!this.coord || !this.snap.listening || seg.sessionId !== this.snap.sessionId) return
     if (!seg.isFinal) {
+      // In a call my own speech is not answered, so I don't surface its partial as the overlay's live question.
+      if (seg.source === 'user' && !this.answerUserSource) return
       this.snap.partial = { ...this.snap.partial, [seg.source]: seg.text }
       if (this.snap.state === 'listening' || this.snap.state === 'answer_ready') this.snap.state = 'partial_transcript'
       this.d.emit()

@@ -147,6 +147,7 @@ export class CaptureController {
   private channels: Partial<Record<Source, Channel>> = {}
   private opts: CaptureOptions | null = null
   private restarts: Record<Source, number> = { user: 0, remote: 0 }
+  private outputSig: string | null = null
   private onDeviceChange = () => void this.handleDeviceChange()
 
   async start(opts: CaptureOptions): Promise<void> {
@@ -202,6 +203,8 @@ export class CaptureController {
       ch.levelTimer = window.setInterval(() => km.sendLevel({ source, rms: ch.level }), 100)
       for (const t of stream.getAudioTracks()) t.addEventListener('ended', () => void this.reopen(source, 'устройство отключено'))
       this.channels[source] = ch
+      this.restarts[source] = 0 // only consecutive failures should count toward the reopen cap
+      if (source === 'remote') this.outputSig = outputSignature(await navigator.mediaDevices.enumerateDevices())
       const label = stream.getAudioTracks()[0]?.label || (source === 'user' ? 'микрофон' : 'системный звук')
       km.sendAudioStatus({ source, state: 'ok', label: source === 'remote' ? 'весь звук Windows (loopback)' : label })
     } catch (e) {
@@ -218,6 +221,7 @@ export class CaptureController {
     const ch = this.channels[source]
     if (!ch) return
     delete this.channels[source]
+    if (source === 'remote') this.outputSig = null
     if (flush) ch.vad.flush()
     clearInterval(ch.levelTimer)
     ch.node.port.onmessage = null
@@ -235,13 +239,32 @@ export class CaptureController {
   }
 
   private async handleDeviceChange(): Promise<void> {
-    const mic = this.channels.user
-    if (!mic || !this.opts) return
+    if (!this.opts) return
     const devices = await navigator.mediaDevices.enumerateDevices()
-    const id = mic.stream.getAudioTracks()[0]?.getSettings().deviceId
-    const gone = !devices.some((d) => d.kind === 'audioinput' && d.deviceId === id)
-    if (gone || !this.opts.micDeviceId) await this.reopen('user', 'смена аудиоустройства')
+    const mic = this.channels.user
+    if (mic) {
+      const id = mic.stream.getAudioTracks()[0]?.getSettings().deviceId
+      const gone = !devices.some((d) => d.kind === 'audioinput' && d.deviceId === id)
+      if (gone || !this.opts.micDeviceId) await this.reopen('user', 'смена микрофона')
+    }
+    // Loopback binds to the default output at open time; follow Windows when it switches (speakers → headphones).
+    if (this.channels.remote) {
+      const sig = outputSignature(devices)
+      if (this.outputSig !== null && sig !== this.outputSig) await this.reopen('remote', 'смена устройства вывода')
+      this.outputSig = sig
+    }
   }
+}
+
+// Signature of the current default output + the set of outputs; it changes when Windows switches playback device.
+function outputSignature(devices: MediaDeviceInfo[]): string {
+  const outs = devices.filter((d) => d.kind === 'audiooutput')
+  const def = outs.find((d) => d.deviceId === 'default')
+  const ids = outs
+    .map((d) => d.deviceId)
+    .sort()
+    .join(',')
+  return `${def?.groupId ?? ''}|${ids}`
 }
 
 async function openMic(deviceId: string | null): Promise<MediaStream> {

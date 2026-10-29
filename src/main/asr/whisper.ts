@@ -21,9 +21,63 @@ const HALLUCINATIONS = [
   /^[.\s…♪]*$/
 ]
 
+// On music/noise whisper emits non-speech annotations in brackets/parens/asterisks or musical notes,
+// e.g. "[музыка]", "[тревожная музыка]", "(applause)", "[BLANK_AUDIO]", "♪♪". Real speech almost never
+// carries them, so I strip them out.
+const TAG = /[[({（【][^\])}）】]*[\])}）】]|\*[^*]+\*|[♪♫🎶🎵]+/gu
+
+export function stripTags(text: string): string {
+  return text.replace(TAG, ' ').replace(/\s+/g, ' ').trim()
+}
+
 export function isHallucination(text: string): boolean {
   const t = text.trim().replace(/^[\s.,!-]+/, '')
+  if (!t) return true
+  // Nothing but bracketed non-speech tags ("[музыка]") is not speech.
+  if (!stripTags(t)) return true
   return HALLUCINATIONS.some((r) => r.test(t))
+}
+
+function norm(w: string): string {
+  return w.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '')
+}
+
+function lev(a: string, b: string): number {
+  const n = b.length
+  if (!a.length) return n
+  if (!n) return a.length
+  const d = Array.from({ length: n + 1 }, (_, j) => j)
+  for (let i = 1; i <= a.length; i++) {
+    let prev = d[0]
+    d[0] = i
+    for (let j = 1; j <= n; j++) {
+      const tmp = d[j]
+      d[j] = Math.min(d[j] + 1, d[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1))
+      prev = tmp
+    }
+  }
+  return d[n]
+}
+
+// The vocabulary used to go into whisper's prompt, but whisper.cpp regurgitates the prompt on noise —
+// that is where phantom "Docker"/"Kubernetes" came from. Instead I fix the spelling/casing of a known
+// term the model ALREADY produced; a fuzzy match can only rewrite a word that was recognized, never
+// insert one that was not spoken. Short terms match on casing only, to avoid "reacts" → "React".
+export function applyVocabulary(text: string, vocab: string[]): string {
+  const terms = vocab.map((t) => ({ canon: t, key: norm(t) })).filter((t) => t.key.length >= 3)
+  if (!terms.length) return text
+  return text.replace(/\p{L}[\p{L}\p{N}]*/gu, (word) => {
+    const k = norm(word)
+    if (k.length < 3) return word
+    for (const t of terms) {
+      if (k === t.key) return t.canon
+      if (t.key.length >= 6 && Math.abs(k.length - t.key.length) <= 2) {
+        const d = lev(k, t.key)
+        if (d > 0 && d <= Math.floor(t.key.length * 0.2)) return t.canon
+      }
+    }
+    return word
+  })
 }
 
 export function encodeWav(pcm: Int16Array, sampleRate = 16000): Buffer {

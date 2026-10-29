@@ -18,6 +18,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",
     "mammoth": "^1.13.0",
+    "onnxruntime-node": "^1.31.1",
     "pdfjs-dist": "^5.7.284",
     "tesseract.js": "^7.0.0"
   },
@@ -31,6 +32,7 @@
     "electron-vite": "^6.0.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "resedit": "1.7.2",
     "typescript": "^5.9.3",
     "vite": "^8.0.0",
     "vitest": "^5.0.5"
@@ -49,15 +51,25 @@
     ],
     "asarUnpack": [
       "node_modules/tesseract.js/**",
-      "node_modules/tesseract.js-core/**"
+      "node_modules/tesseract.js-core/**",
+      "node_modules/onnxruntime-node/**"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/silero_vad.onnx",
+        "to": "silero_vad.onnx"
+      }
     ],
     "win": {
+      "executableName": "Kairos M",
       "icon": "resources/icon.ico",
       "target": [
         "nsis"
       ]
     },
     "nsis": {
+      "artifactName": "Kairos M Setup ${version}.${ext}",
+      "uninstallDisplayName": "Kairos M",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,

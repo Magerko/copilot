@@ -154,6 +154,24 @@ describe('SessionManager', () => {
     expect(mgr.snap.state).not.toBe('generating')
   })
 
+  it('in a call my own partial speech never shows as the overlay question; the interlocutor s does', () => {
+    const { mgr } = setup()
+    const id = mgr.start({ mode: 'live' })
+    const partial = (source: 'user' | 'remote', text: string) =>
+      mgr.onSegment({ sessionId: id, segmentId: `s-${source}`, source, startMs: 0, endMs: 1000, text, isFinal: false, lang: null })
+    partial('user', 'это я проговариваю вопрос вслух')
+    expect(mgr.snap.partial.user).toBeUndefined()
+    partial('remote', 'расскажите про CAP теорему')
+    expect(mgr.snap.partial.remote).toBe('расскажите про CAP теорему')
+  })
+
+  it('in practice mode my own partial is shown (I read questions aloud)', () => {
+    const { mgr } = setup()
+    const id = mgr.start({ mode: 'practice' })
+    mgr.onSegment({ sessionId: id, segmentId: 'u', source: 'user', startMs: 0, endMs: 1000, text: 'что такое транзакция', isFinal: false, lang: null })
+    expect(mgr.snap.partial.user).toBe('что такое транзакция')
+  })
+
   it('rapid re-asking with default concurrency never blocks the newest question', async () => {
     const { mgr } = setup({ delayMs: 10 })
     mgr.start({ mode: 'practice' })

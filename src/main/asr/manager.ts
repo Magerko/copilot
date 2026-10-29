@@ -1,7 +1,11 @@
 import type { AsrStatus, Lang, Source, TranscriptSegment } from '@shared/types'
 import type { FetchFn } from '../providers/adapter'
 import { AsrAssets, MODELS, type AsrBackend } from './assets'
-import { isHallucination, WhisperSidecar } from './whisper'
+import type { SileroGate } from './silero'
+import { applyVocabulary, isHallucination, stripTags, WhisperSidecar } from './whisper'
+
+// Silero needs at least this much detected speech in a clip; below it the clip is music/noise/silence and never reaches whisper.
+const MIN_SPEECH_S = 0.2
 
 export interface AsrJob {
   sessionId: string
@@ -44,7 +48,8 @@ export class AsrManager {
     private assets: AsrAssets,
     private fetch: FetchFn,
     private cfg: AsrConfig,
-    private ev: AsrEvents
+    private ev: AsrEvents,
+    private silero?: SileroGate
   ) {
     this.st = { binary: false, model: cfg.model, modelPresent: false, running: false, lastLatencyMs: null, download: null, error: null }
     this.refreshStatus()
@@ -152,16 +157,30 @@ export class AsrManager {
           if (job.final) this.emit(job, '', null)
           continue
         }
+        // Silero speech gate: drop music/noise/silence before whisper so it can't hallucinate on them.
+        if (this.silero) {
+          const speechS = await this.silero.speechSeconds(job.pcm)
+          if (speechS >= 0 && speechS < MIN_SPEECH_S) {
+            if (job.final) {
+              this.ev.log('asr_nonspeech', { audioMs: Math.round(job.pcm.length / 16), speechMs: Math.round(speechS * 1000) })
+              this.emit(job, '', null)
+            }
+            continue
+          }
+        }
         const lang = this.cfg.language
         try {
-          const r = await this.sidecar!.transcribe(job.pcm, lang, this.cfg.vocabulary.join(', '))
+          // No vocabulary in the prompt: whisper.cpp echoes the prompt on noise (phantom "Docker"/"Kubernetes").
+          const r = await this.sidecar!.transcribe(job.pcm, lang, '')
           this.st = { ...this.st, lastLatencyMs: r.ms }
           if (job.final) {
             this.ev.status(this.st)
             this.ev.log('asr_latency', { ms: r.ms, audioMs: Math.round(job.pcm.length / 16), lang, model: this.cfg.model, backend: this.cfg.backend })
           }
           const garbage = isHallucination(r.text) || (r.noSpeech > 0.6 && r.avgLogprob < -1)
-          this.emit(job, garbage ? '' : r.text, r.lang && LANGS.has(r.lang) ? r.lang : null)
+          let text = garbage ? '' : stripTags(r.text)
+          if (text) text = applyVocabulary(text, this.cfg.vocabulary)
+          this.emit(job, text, r.lang && LANGS.has(r.lang) ? r.lang : null)
         } catch (e) {
           this.ev.log('asr_error', { message: e instanceof Error ? e.message : String(e) })
           if (job.final) this.emit(job, '', null)
