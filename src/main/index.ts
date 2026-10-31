@@ -38,9 +38,11 @@ import { BudgetManager } from './budget/budget'
 import { extractText } from './context/importers'
 import { chunkText } from './context/retrieval'
 import { runDiagnostics } from './diagnostics'
+import { setLang, t } from '@shared/i18n'
 import { exportSession } from './export'
+import { ensureMicrophone, mediaAccess, openPrivacyPane } from './media/permissions'
 import { checkEndpoint, NetGuard } from './net/guard'
-import { PRESETS } from './providers/presets'
+import { PRESETS, presetsForUi } from './providers/presets'
 import { ProviderRegistry } from './providers/registry'
 import { runStream } from './providers/runner'
 import { Ocr } from './screen/ocr'
@@ -49,7 +51,7 @@ import { Db } from './storage/db'
 import { redact, redactDeep } from './storage/redact'
 import { SecretStore } from './storage/secrets'
 import { SettingsStore } from './storage/settings'
-import { appIcon } from './util/png'
+import { appIcon, trayTemplateIcon } from './util/png'
 import { createDashboard, createOverlay, createPicker, displayProtectionSupported, sanitizeBounds } from './windows/windows'
 
 app.setAppUserModelId('app.copilot')
@@ -107,7 +109,7 @@ function s(): Settings {
 
 function ensureDefaultProfile(): void {
   if (!db.listProfiles().length) {
-    db.upsertProfile({ id: 'default', name: 'Основной', preset: 'backend', style: 'natural', notes: '' })
+    db.upsertProfile({ id: 'default', name: t('Основной'), preset: 'backend', style: 'natural', notes: '' })
   }
 }
 
@@ -145,22 +147,23 @@ function updateLlmStatus(): void {
   sessionMgr.snap.status.llm = quick
     ? {
         state: st.offline && !quick.isLocal ? 'error' : tOk ? 'ok' : tOk === false ? 'error' : 'warn',
-        label: `${quick.cfg.label} · ${quick.model}${quick.isLocal ? ' · локально' : ' · облако'}${tOk === undefined ? ' · не проверено' : tOk ? '' : ' · последний запрос с ошибкой'}`
+        label: `${quick.cfg.label} · ${quick.model} · ${quick.isLocal ? t('локально') : t('облако')}${tOk === undefined ? ` · ${t('не проверено')}` : tOk ? '' : ` · ${t('последний запрос с ошибкой')}`}`
       }
-    : { state: 'warn', label: 'модель не выбрана' }
+    : { state: 'warn', label: t('модель не выбрана') }
   const vOk = vision ? registry.visionOk.get(`${vision.cfg.id}/${vision.model}`) : undefined
   sessionMgr.snap.status.vision = vision
     ? {
         state: vOk === false ? 'error' : vOk ? 'ok' : 'warn',
-        label: `${vision.model}${vOk ? '' : vOk === false ? ' · проверка не пройдена' : ' · не проверено'}`
+        label: `${vision.model}${vOk ? '' : vOk === false ? ` · ${t('проверка не пройдена')}` : ` · ${t('не проверено')}`}`
       }
-    : { state: ocr.installed() ? 'warn' : 'off', label: ocr.installed() ? 'только локальный OCR' : 'выкл.' }
-  sessionMgr.snap.status.network = st.offline ? { state: 'warn', label: 'офлайн-режим: внешние вызовы заблокированы' } : { state: 'ok', label: 'онлайн' }
+    : { state: ocr.installed() ? 'warn' : 'off', label: ocr.installed() ? t('только локальный OCR') : t('выкл.') }
+  sessionMgr.snap.status.network = st.offline ? { state: 'warn', label: t('офлайн-режим: внешние вызовы заблокированы') } : { state: 'ok', label: t('онлайн') }
   emit()
 }
 
 function applySettings(prev: Settings | null): void {
   const st = s()
+  setLang(st.uiLang)
   guard.setOffline(st.offline)
   budget.update(st.budget, st.pricing)
   asr.setConfig(asrConfig())
@@ -169,9 +172,22 @@ function applySettings(prev: Settings | null): void {
     const o = st.overlay
     overlay.setAlwaysOnTop(o.pinned, 'screen-saver')
     if (prev.overlay.protect !== o.protect) applyProtection()
-    if (prev.overlay.theme !== o.theme) overlay.setBackgroundColor(o.theme === 'dark' ? '#14161b' : '#f7f7f5')
+    // The window stays transparent in both themes; the panel CSS draws the (semi-transparent) background.
+    if (JSON.stringify(prev.overlay.size) !== JSON.stringify(o.size)) applyOverlaySize()
   }
   if (!prev || prev.window.protectFromCapture !== st.window.protectFromCapture) applyWindowProtection()
+  if (!prev || prev.window.hideFromDock !== st.window.hideFromDock) applyDockVisibility()
+  // Status labels are stored already translated, so a language switch rebuilds them (LLM and network refresh below).
+  if (prev && prev.uiLang !== st.uiLang) {
+    applyProtection()
+    asr.refreshStatus()
+    refreshTray()
+    if (overlay && !overlay.isDestroyed())
+      sessionMgr.setStatus(
+        'overlay',
+        overlay.isVisible() ? { state: 'ok', label: st.overlay.expanded ? t('развёрнут') : t('компактный') } : { state: 'off', label: t('скрыт') }
+      )
+  }
   updateLlmStatus()
   broadcast('km:settings', st)
 }
@@ -185,13 +201,21 @@ function applyProtection(): void {
   sessionMgr.setStatus(
     'protection',
     !want
-      ? { state: 'off', label: 'выкл.' }
+      ? { state: 'off', label: t('выкл.') }
       : !supported
-        ? { state: 'error', label: 'не поддерживается этой версией Windows' }
+        ? { state: 'error', label: t('не поддерживается этой версией системы') }
         : live
-          ? { state: 'warn', label: 'флаг установлен — работает не со всеми программами захвата, проверьте у получателя' }
-          : { state: 'warn', label: 'включится при показе подсказок' }
+          ? { state: 'warn', label: t('флаг установлен — работает не со всеми программами захвата, проверьте у получателя') }
+          : { state: 'warn', label: t('включится при показе подсказок') }
   )
+}
+
+/** Width always follows the setting; height only in expanded mode, compact mode re-fits to the content up to the cap. */
+function applyOverlaySize(): void {
+  if (!overlay || overlay.isDestroyed()) return
+  const { size, expanded } = s().overlay
+  const b = overlay.getBounds()
+  overlay.setBounds({ ...b, width: size.width, height: expanded ? size.height : Math.min(b.height, size.height) })
 }
 
 function ensureOverlay(): BrowserWindow {
@@ -207,10 +231,18 @@ function ensureOverlay(): BrowserWindow {
     }, 400)
   }
   overlay.on('moved', save)
-  overlay.on('resized', save)
+  overlay.on('resized', () => {
+    save()
+    // A manual resize is the user choosing a size: I keep the width, and the height too when it is not auto-fitted.
+    if (!overlay || overlay.isDestroyed()) return
+    const b = overlay.getBounds()
+    const o = s().overlay
+    settings.patch({ overlay: { size: { width: b.width, height: o.expanded ? b.height : o.size.height } } })
+    broadcast('km:settings', s())
+  })
   overlay.on('closed', () => {
     overlay = null
-    sessionMgr.setStatus('overlay', { state: 'off', label: 'скрыт' })
+    sessionMgr.setStatus('overlay', { state: 'off', label: t('скрыт') })
   })
   overlay.webContents.once('did-finish-load', () => {
     overlay?.webContents.send('km:settings', s())
@@ -222,16 +254,59 @@ function ensureOverlay(): BrowserWindow {
 
 function showOverlay(): void {
   const w = ensureOverlay()
-  w.setBounds(sanitizeBounds(w.getBounds()))
+  w.setBounds(sanitizeBounds(w.getBounds(), s().overlay.size))
   // I show it inactive so the foreground window (IDE, Zoom) keeps keyboard focus (spike S1).
   w.showInactive()
-  sessionMgr.setStatus('overlay', { state: 'ok', label: s().overlay.expanded ? 'развёрнут' : 'компактный' })
+  sessionMgr.setStatus('overlay', { state: 'ok', label: s().overlay.expanded ? t('развёрнут') : t('компактный') })
+}
+
+// Teleprompter size: narrow enough to sit between the camera and the screen centre, tall enough for cues + details.
+const UNDER_CAMERA = { width: 400, height: 550, fontScale: 1.1 }
+
+/**
+ * Teleprompter preset: a narrow window centred right under the menu bar of the display it is on, where the built-in
+ * camera sits, so reading notes during a talk or a work call keeps the eyes near the lens.
+ */
+function placeUnderCamera(): void {
+  const w = ensureOverlay()
+  const display = screen.getDisplayMatching(w.getBounds())
+  const wa = display.workArea
+  const width = Math.min(UNDER_CAMERA.width, wa.width - 48)
+  const height = Math.min(UNDER_CAMERA.height, wa.height - 12)
+  const bounds = { x: Math.round(wa.x + (wa.width - width) / 2), y: wa.y + 6, width, height }
+  w.setBounds(bounds)
+  settings.patch({ overlay: { bounds, displayId: display.id, size: { width, height }, fontScale: UNDER_CAMERA.fontScale } })
+  broadcast('km:settings', s())
+  if (!w.isVisible()) showOverlay()
+}
+
+/**
+ * Typing a question means the overlay must take keyboard focus for a moment — it never does otherwise, so keystrokes
+ * keep going to the call or the IDE. When typing ends I make it unfocusable again and hand focus back.
+ */
+function setOverlayTyping(on: boolean): void {
+  const w = on ? ensureOverlay() : overlay
+  if (!w || w.isDestroyed()) return
+  if (on) {
+    w.setFocusable(true)
+    w.show()
+    w.focus()
+    w.webContents.send('km:typing', true)
+    return
+  }
+  w.webContents.send('km:typing', false)
+  w.setFocusable(false)
+  // On macOS hiding the app returns focus to the app the user was in; I bring the overlay back without activating it.
+  if (process.platform === 'darwin' && !dashboard?.isVisible()) {
+    app.hide()
+    w.showInactive()
+  } else w.blur()
 }
 
 function toggleOverlay(): void {
   if (overlay?.isVisible()) {
     overlay.hide()
-    sessionMgr.setStatus('overlay', { state: 'off', label: 'скрыт' })
+    sessionMgr.setStatus('overlay', { state: 'off', label: t('скрыт') })
   } else showOverlay()
 }
 
@@ -239,7 +314,18 @@ function showDashboard(): void {
   if (!dashboard || dashboard.isDestroyed()) dashboard = makeDashboard()
   if (dashboard.isMinimized()) dashboard.restore()
   dashboard.show()
+  // Without a Dock icon macOS does not bring the app forward on its own when the window is shown from the menu bar.
+  if (process.platform === 'darwin') app.focus({ steal: true })
   dashboard.focus()
+}
+
+function applyDockVisibility(): void {
+  if (process.platform !== 'darwin' || !app.dock) return
+  if (s().window.hideFromDock) app.dock.hide()
+  else {
+    void app.dock.show()
+    if (!app.isPackaged) app.dock.setIcon(nativeImage.createFromBuffer(appIcon(512)))
+  }
 }
 
 function makeDashboard(): BrowserWindow {
@@ -250,7 +336,7 @@ function makeDashboard(): BrowserWindow {
     // I nudge once so the window doesn't just "vanish" the first time.
     if (!trayHintShown && tray) {
       trayHintShown = true
-      tray.displayBalloon?.({ title: 'Copilot', content: 'Свёрнуто в трей. Нажмите значок, чтобы открыть.' })
+      tray.displayBalloon?.({ title: 'Copilot', content: t('Свёрнуто в трей. Нажмите значок, чтобы открыть.') })
     }
   }
   w.on('close', (e) => {
@@ -371,6 +457,7 @@ const SHORTCUT_ACTIONS: Record<ShortcutAction, () => void> = {
     broadcast('km:settings', s())
     if (expanded && !sessionMgr.snap.answers.deep) sessionMgr.answerNow('deep', 'hotkey')
   },
+  askTyped: () => setOverlayTyping(true),
   panic
 }
 
@@ -381,20 +468,30 @@ function registerShortcuts(): void {
   for (const [action, accel] of Object.entries(s().shortcuts) as [ShortcutAction, string][]) {
     if (!accel) continue
     try {
-      if (!globalShortcut.register(accel, SHORTCUT_ACTIONS[action])) shortcutConflicts.push(`${accel} (${action}) занято другой программой`)
+      const run = () => {
+        // A press that never shows up here never reached the app (another program or an event tap took it).
+        log('shortcut', { action, accel })
+        SHORTCUT_ACTIONS[action]()
+      }
+      if (!globalShortcut.register(accel, run)) shortcutConflicts.push(t('{accel} ({action}) занято другой программой', { accel, action }))
     } catch {
-      shortcutConflicts.push(`${accel} (${action}) — некорректное сочетание`)
+      shortcutConflicts.push(t('{accel} ({action}) — некорректное сочетание', { accel, action }))
     }
   }
   if (shortcutConflicts.length) log('shortcut_conflicts', shortcutConflicts)
+  else
+    log(
+      'shortcuts_registered',
+      Object.values(s().shortcuts).filter((a) => a && globalShortcut.isRegistered(a))
+    )
 }
 
-const SCREEN_DENIED = 'Снимки экрана выключены — разрешите их в «Настройки → Приватность»'
+const screenDenied = () => t('Снимки экрана выключены — разрешите их в «Настройки → Приватность»')
 
 async function beginRegion(): Promise<void> {
   if (picker) return
   if (!s().consent.screen) {
-    sessionMgr.notice(SCREEN_DENIED)
+    sessionMgr.notice(screenDenied())
     return
   }
   const cursor = screen.getCursorScreenPoint()
@@ -406,7 +503,7 @@ async function beginRegion(): Promise<void> {
     const size = { width: Math.round(display.size.width * display.scaleFactor), height: Math.round(display.size.height * display.scaleFactor) }
     const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: size })
     const src = sources.find((x) => x.display_id === String(display.id)) ?? sources[0]
-    if (!src) throw new Error('Не удалось получить изображение экрана')
+    if (!src) throw new Error(t('Не удалось получить изображение экрана'))
     const dataUrl = src.thumbnail.toDataURL()
     picker = createPicker(display)
     applyWindowProtection()
@@ -415,7 +512,13 @@ async function beginRegion(): Promise<void> {
       if (overlayWasVisible && !protectedOverlay) overlay?.showInactive()
     })
     picker.webContents.once('did-finish-load', () => {
-      picker?.webContents.send('km:picker-init', { dataUrl, scale: display.scaleFactor, hasVision: !!registry.resolve('vision', s()), ocr: ocr.installed() })
+      picker?.webContents.send('km:picker-init', {
+        dataUrl,
+        scale: display.scaleFactor,
+        hasVision: !!registry.resolve('vision', s()),
+        ocr: ocr.installed(),
+        uiLang: s().uiLang
+      })
       picker?.show()
       picker?.focus()
     })
@@ -425,10 +528,10 @@ async function beginRegion(): Promise<void> {
   }
 }
 
-async function submitRegion(pngBase64: string, task: ScreenTask, withCode: boolean, codeLang: string): Promise<void> {
+async function submitRegion(pngBase64: string, task: ScreenTask, withCode: boolean, codeLang: string, instruction = ''): Promise<void> {
   picker?.close()
   if (!s().consent.screen) {
-    sessionMgr.notice(SCREEN_DENIED)
+    sessionMgr.notice(screenDenied())
     return
   }
   let img = nativeImage.createFromBuffer(Buffer.from(pngBase64, 'base64'))
@@ -438,15 +541,15 @@ async function submitRegion(pngBase64: string, task: ScreenTask, withCode: boole
   const target = registry.resolve('vision', s())
   const visionKnownBad = target ? registry.visionOk.get(`${target.cfg.id}/${target.model}`) === false : true
   if (target && !visionKnownBad) {
-    await sessionMgr.screen({ mime: 'image/png', base64: png.toString('base64') }, null, task, withCode, codeLang)
+    await sessionMgr.screen({ mime: 'image/png', base64: png.toString('base64') }, null, task, withCode, codeLang, instruction)
     return
   }
   try {
-    sessionMgr.notice('Модель без vision — использован локальный OCR (качество зависит от чёткости текста)')
+    sessionMgr.notice(t('Модель без vision — использован локальный OCR (качество зависит от чёткости текста)'))
     const text = await ocr.recognize(png)
-    await sessionMgr.screen(null, text || '(OCR не нашёл текста)', task, withCode, codeLang)
+    await sessionMgr.screen(null, text || t('(OCR не нашёл текста)'), task, withCode, codeLang, instruction)
   } catch (e) {
-    sessionMgr.notice(`Снимок не отправлен: ${e instanceof Error ? e.message : String(e)}`)
+    sessionMgr.notice(t('Снимок не отправлен: {reason}', { reason: e instanceof Error ? e.message : String(e) }))
   }
 }
 
@@ -461,31 +564,51 @@ function outgoingPreview(): OutgoingPreview {
   return {
     recipients: [...seen.values()],
     items: [
-      'Аудио не покидает компьютер — распознаётся локально (whisper.cpp)',
-      'Провайдеру ответов уходит: текст текущего вопроса, последние минуты транскрипта, подходящие фрагменты CV/JD и заметки профиля',
-      'Снимки экрана — только после вашего выделения и подтверждения',
-      st.history && st.consent.history ? 'История сохраняется только на этом компьютере (SQLite)' : 'История не сохраняется'
+      t('Аудио не покидает компьютер — распознаётся локально (whisper.cpp)'),
+      t('Провайдеру ответов уходит: текст текущего вопроса, последние минуты транскрипта, подходящие фрагменты CV/JD и заметки профиля'),
+      t('Снимки экрана — только после вашего выделения и подтверждения'),
+      st.history && st.consent.history ? t('История сохраняется только на этом компьютере (SQLite)') : t('История не сохраняется')
     ]
   }
+}
+
+/** macOS gets a monochrome template mark that matches the other menu bar icons; Windows keeps the coloured tile. */
+function trayImage(icon: Electron.NativeImage): Electron.NativeImage {
+  if (process.platform !== 'darwin') return icon.resize({ width: 16, height: 16 })
+  const img = nativeImage.createEmpty()
+  img.addRepresentation({ scaleFactor: 1, buffer: trayTemplateIcon(18) })
+  img.addRepresentation({ scaleFactor: 2, buffer: trayTemplateIcon(36) })
+  img.setTemplateImage(true)
+  return img
 }
 
 function refreshTray(): void {
   if (!tray) return
   const active = sessionMgr.active
-  tray.setToolTip(active ? (sessionMgr.snap.listening ? 'Copilot — слушает' : 'Copilot — пауза') : 'Copilot')
+  tray.setToolTip(active ? (sessionMgr.snap.listening ? t('Copilot — слушает') : t('Copilot — пауза')) : 'Copilot')
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: 'Открыть Copilot', click: showDashboard },
-      { label: 'Показать/скрыть подсказки', click: toggleOverlay },
+      { label: t('Открыть Copilot'), click: showDashboard },
+      { label: t('Показать/скрыть подсказки'), click: toggleOverlay },
       active
-        ? { label: sessionMgr.snap.listening ? 'Пауза' : 'Продолжить', click: toggleListen }
-        : { label: 'Начать сессию', click: () => startSession('live') },
-      ...(active ? [{ label: 'Завершить сессию', click: stopSession }] : []),
+        ? { label: sessionMgr.snap.listening ? t('Пауза') : t('Продолжить'), click: toggleListen }
+        : { label: t('Начать сессию'), click: () => startSession('live') },
+      ...(active ? [{ label: t('Завершить сессию'), click: stopSession }] : []),
       { type: 'separator' },
-      { label: 'Аварийная остановка', click: panic },
-      { label: 'Выход', click: () => app.quit() }
+      { label: t('Аварийная остановка'), click: panic },
+      { label: t('Выход'), click: () => app.quit() }
     ])
   )
+}
+
+// Electron throws from the callback when a video request gets no stream, yet the request is still rejected; I keep that
+// throw out of the unhandled-error log.
+function denyDisplayMedia(cb: (streams: Electron.Streams) => void): void {
+  try {
+    cb({})
+  } catch {
+    // expected: the renderer's getDisplayMedia rejects and reports the missing permission
+  }
 }
 
 function lockDownSessions(): void {
@@ -504,15 +627,29 @@ function lockDownSessions(): void {
     if (!allowed) log('renderer_blocked', { url: u.split('?')[0] })
     cb({ cancel: !allowed })
   })
-  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => {
-    cb(permission === 'media' || permission === 'display-capture' || permission === 'clipboard-sanitized-write')
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb, details) => {
+    if (permission === 'media') {
+      const wantsMic = 'mediaTypes' in details && (details.mediaTypes ?? []).includes('audio')
+      if (wantsMic) return void ensureMicrophone().then(cb)
+      return cb(true)
+    }
+    cb(permission === 'display-capture' || permission === 'clipboard-sanitized-write')
   })
   session.defaultSession.setDisplayMediaRequestHandler(
     (_req, cb) => {
-      void desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
-        // I use only the audio loopback; the renderer stops the video track immediately.
-        cb(sources[0] ? { video: sources[0], audio: 'loopback' } : {})
-      })
+      // On macOS the first getSources() registers the app under «Screen & System Audio Recording» and shows the prompt;
+      // until it is granted the call fails or returns nothing, and the renderer reports the missing permission.
+      desktopCapturer
+        .getSources({ types: ['screen'] })
+        .then((sources) => {
+          // I use only the audio loopback; the renderer stops the video track immediately.
+          if (sources[0]) cb({ video: sources[0], audio: 'loopback' })
+          else denyDisplayMedia(cb)
+        })
+        .catch((e: unknown) => {
+          log('display_media_fail', { message: e instanceof Error ? e.message : String(e), access: mediaAccess().screen })
+          denyDisplayMedia(cb)
+        })
     },
     { useSystemPicker: false }
   )
@@ -544,7 +681,7 @@ function registerIpc(): void {
     snapshot: sessionMgr.snap,
     settings: s(),
     interrupted,
-    presets: PRESETS,
+    presets: presetsForUi(),
     asr: asr.status,
     preview: outgoingPreview(),
     resumable: db.lastResumable(),
@@ -623,22 +760,27 @@ function registerIpc(): void {
   })
 
   handle('km:overlay:toggle', () => toggleOverlay())
+  handle('km:overlay:underCamera', () => placeUnderCamera())
+  handle('km:overlay:typing', (on: boolean) => setOverlayTyping(!!on))
   handle('km:overlay:expand', (v: boolean) => {
     settings.patch({ overlay: { expanded: v } })
+    if (v) applyOverlaySize()
     broadcast('km:settings', s())
     if (v && !sessionMgr.snap.answers.deep && sessionMgr.snap.activeQuestion) sessionMgr.answerNow('deep', 'manual')
   })
   handle('km:overlay:fit', (h: number) => {
     if (!overlay) return
     const b = overlay.getBounds()
-    overlay.setBounds({ ...b, height: Math.max(120, Math.min(900, Math.round(h))) })
+    overlay.setBounds({ ...b, height: Math.max(120, Math.min(s().overlay.size.height, Math.round(h))) })
   })
   handle('km:copy', (text: string) => {
     clipboard.writeText(text)
   })
 
   handle('km:screen:begin', () => beginRegion())
-  handle('km:screen:submit', (png: string, task: ScreenTask, withCode: boolean, codeLang: string) => submitRegion(png, task, withCode, codeLang))
+  handle('km:screen:submit', (png: string, task: ScreenTask, withCode: boolean, codeLang: string, instruction?: string) =>
+    submitRegion(png, task, withCode, codeLang, typeof instruction === 'string' ? instruction : '')
+  )
   handle('km:screen:cancel', () => picker?.close())
 
   handle('km:profiles:list', () => db.listProfiles())
@@ -648,7 +790,7 @@ function registerIpc(): void {
     return saved
   })
   handle('km:profiles:remove', (id: string) => {
-    if (db.listProfiles().length <= 1) throw new Error('Нельзя удалить последний профиль')
+    if (db.listProfiles().length <= 1) throw new Error(t('Нельзя удалить последний профиль'))
     db.deleteProfile(id)
     if (s().activeProfileId === id) settings.patch({ activeProfileId: db.listProfiles()[0].id })
     sessionMgr.reloadKnowledge()
@@ -656,14 +798,14 @@ function registerIpc(): void {
   handle('km:knowledge:list', (profileId: string) => db.listDocs(profileId))
   handle('km:knowledge:import', async (profileId: string, kind: 'cv' | 'jd' | 'notes') => {
     const r = await dialog.showOpenDialog(dashboard!, {
-      title: 'Выберите документ',
+      title: t('Выберите документ'),
       properties: ['openFile'],
-      filters: [{ name: 'Документы', extensions: ['pdf', 'docx', 'txt', 'md'] }]
+      filters: [{ name: t('Документы'), extensions: ['pdf', 'docx', 'txt', 'md'] }]
     })
     if (r.canceled || !r.filePaths[0]) return null
     const path = r.filePaths[0]
     const text = await extractText(path)
-    if (!text.trim()) throw new Error('В документе не найден текст (возможно, это скан — нужен OCR)')
+    if (!text.trim()) throw new Error(t('В документе не найден текст (возможно, это скан — нужен OCR)'))
     const pieces = chunkText(text)
     const docId = randomUUID()
     const name = path.split(/[\\/]/).pop()!
@@ -741,12 +883,15 @@ function registerIpc(): void {
     })
   )
   handle('km:diagnostics:log', () => db.recentDiag(100))
+  handle('km:media:access', () => mediaAccess())
+  handle('km:media:openPrivacy', (kind: 'microphone' | 'screen') => openPrivacyPane(kind))
   handle('km:open', (url: string) => {
     if (/^https:\/\//.test(url)) void shell.openExternal(url)
   })
 }
 
 app.whenReady().then(() => {
+  setLang(s().uiLang)
   ensureDefaultProfile()
   secrets = new SecretStore(join(dataDir, 'secrets.bin'), {
     available: () => safeStorage.isEncryptionAvailable(),
@@ -787,14 +932,17 @@ app.whenReady().then(() => {
       segment: (seg) => sessionMgr.onSegment(seg),
       status: (st) => {
         sessionMgr.snap.status.asr = st.download
-          ? { state: 'busy', label: `загрузка ${st.download.name}: ${Math.round((st.download.received / Math.max(1, st.download.total)) * 100)}%` }
+          ? {
+              state: 'busy',
+              label: t('загрузка {name}: {pct}%', { name: st.download.name, pct: Math.round((st.download.received / Math.max(1, st.download.total)) * 100) })
+            }
           : st.error
             ? { state: 'error', label: st.error }
             : !st.binary || !st.modelPresent
-              ? { state: 'warn', label: 'не установлено' }
+              ? { state: 'warn', label: t('не установлено') }
               : st.running
-                ? { state: 'ok', label: `whisper ${st.model} · локально${st.lastLatencyMs ? ` · ${st.lastLatencyMs} мс` : ''}` }
-                : { state: 'ok', label: `whisper ${st.model} · установлен` }
+                ? { state: 'ok', label: `whisper ${st.model} · ${t('локально')}${st.lastLatencyMs ? ` · ${t('{ms} мс', { ms: st.lastLatencyMs })}` : ''}` }
+                : { state: 'ok', label: `whisper ${st.model} · ${t('установлен')}` }
         broadcast('km:asr', st)
         emit()
       },
@@ -807,10 +955,10 @@ app.whenReady().then(() => {
   registerIpc()
   applySettings(null)
   applyProtection()
-  if (interrupted) sessionMgr.snap.notice = 'Прошлая сессия завершилась аварийно — её транскрипт сохранён в «Истории».'
+  if (interrupted) sessionMgr.snap.notice = t('Прошлая сессия завершилась аварийно — её транскрипт сохранён в «Истории».')
 
   const icon = nativeImage.createFromBuffer(appIcon(64))
-  tray = new Tray(icon.resize({ width: 16, height: 16 }))
+  tray = new Tray(trayImage(icon))
   tray.on('click', showDashboard)
   refreshTray()
   dashboard = makeDashboard()

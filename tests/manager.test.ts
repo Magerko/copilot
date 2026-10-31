@@ -31,8 +31,19 @@ class FakeAdapter implements ProviderAdapter {
   }
 }
 
-function setup(opts: { local?: boolean; cloudConsent?: boolean; delayMs?: number; failLocal?: boolean; offline?: boolean; history?: boolean } = {}) {
+function setup(
+  opts: {
+    local?: boolean
+    cloudConsent?: boolean
+    delayMs?: number
+    failLocal?: boolean
+    offline?: boolean
+    history?: boolean
+    answerFormat?: 'text' | 'cues'
+  } = {}
+) {
   const settings: Settings = deepMerge(DEFAULT_SETTINGS, {
+    answerFormat: opts.answerFormat ?? 'text',
     autoAnswer: true,
     history: opts.history ?? false,
     offline: opts.offline ?? false,
@@ -89,6 +100,56 @@ async function until(cond: () => boolean, ms = 2000) {
 }
 
 describe('SessionManager', () => {
+  const image = { mime: 'image/png', base64: 'AAAA' }
+  const prior = (text: string, endMs: number) => ({
+    sessionId: 'old',
+    segmentId: text,
+    source: 'remote' as const,
+    startMs: endMs - 500,
+    endMs,
+    text,
+    isFinal: true,
+    lang: 'uk'
+  })
+
+  it('screen «solve on its own» sends only the capture: no transcript, no earlier questions', async () => {
+    const { mgr, adapter } = setup()
+    mgr.continuePrevious([prior('Розкажіть про тест-дизайн', 1000)], 'practice')
+    await mgr.screen(image, null, 'solve', false, 'Python')
+    await until(() => adapter.calls.length > 0)
+    const user = String(adapter.calls[0].messages[1].content)
+    expect(user).not.toContain('<transcript>')
+    expect(user).not.toContain('тест-дизайн')
+    expect(adapter.calls[0].messages[1].images).toEqual([image])
+  })
+
+  it('screen «question from the conversation» looks only at the last two minutes', async () => {
+    const { mgr, adapter } = setup()
+    mgr.continuePrevious([prior('Стара фраза п’ять хвилин тому', 0), prior('Що поверне функція для null?', 300_000)], 'practice')
+    await mgr.screen(image, null, 'context', false, 'Python')
+    await until(() => adapter.calls.length > 0)
+    const user = String(adapter.calls[0].messages[1].content)
+    expect(user).toContain('Що поверне функція для null?')
+    expect(user).not.toContain('Стара фраза')
+  })
+
+  it('screen «your task» shows the typed task as the question', async () => {
+    const { mgr } = setup()
+    mgr.start({ mode: 'practice' })
+    await mgr.screen(image, null, 'custom', false, 'Python', 'Напиши тест-кейси для цієї форми')
+    expect(mgr.snap.activeQuestion?.text).toBe('[Экран] Напиши тест-кейси для цієї форми')
+  })
+
+  it('cue mode asks for cues and the detailed answer — no talking points to read', async () => {
+    const { mgr, adapter } = setup({ answerFormat: 'cues' })
+    mgr.start({ mode: 'practice' })
+    mgr.askTyped('Які є види тестування?')
+    await until(() => mgr.snap.answers.say?.status === 'done' && mgr.snap.answers.deep?.status === 'done')
+    expect(mgr.snap.answers.points).toBeUndefined()
+    expect(adapter.calls).toHaveLength(2)
+    expect(String(adapter.calls[0].messages[0].content)).toContain('2–5 cues')
+  })
+
   it('typed question yields say + points and settles in answer_ready', async () => {
     const { mgr } = setup()
     mgr.start({ mode: 'practice' })

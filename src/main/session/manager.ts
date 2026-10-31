@@ -15,14 +15,15 @@ import type {
   TranscriptSegment
 } from '@shared/types'
 import type { BudgetManager } from '../budget/budget'
-import { buildPrompt } from '../context/prompt'
-import { Bm25Index, type Chunk } from '../context/retrieval'
+import { buildPrompt, SCREEN_CONTEXT_MS } from '../context/prompt'
+import { Bm25Index, selectKnowledge, type Chunk } from '../context/retrieval'
 import type { ProviderAdapter } from '../providers/adapter'
 import { appError, ProviderError, toAppError } from '../providers/errors'
 import { runStream } from '../providers/runner'
 import type { Db } from '../storage/db'
 import { AnswerBoard } from './board'
 import { DEFAULT_COORDINATOR, QuestionCoordinator, type Decision } from './coordinator'
+import { t } from '@shared/i18n'
 
 export interface ResolvedTarget {
   cfg: ProviderConfig
@@ -54,13 +55,14 @@ interface Inflight {
   release: () => void
 }
 
-const CLOUD_DENIED = 'Отправка в облако не разрешена — включите её в «Приватность» или выберите локальную модель'
+const cloudDenied = () => t('Отправка в облако не разрешена — включите её в «Приватность» или выберите локальную модель')
 
-const OFF: ComponentStatus = { state: 'off', label: 'выкл.' }
+const off = (): ComponentStatus => ({ state: 'off', label: t('выкл.') })
 
 export function emptySnapshot(): AppSnapshot {
   return {
     sessionId: null,
+    startedAt: null,
     state: 'idle',
     listening: false,
     activeQuestion: null,
@@ -69,7 +71,16 @@ export function emptySnapshot(): AppSnapshot {
     recentQuestions: [],
     partial: {},
     segments: [],
-    status: { mic: OFF, system: OFF, asr: OFF, llm: OFF, vision: OFF, overlay: OFF, protection: OFF, network: { state: 'ok', label: 'онлайн' } },
+    status: {
+      mic: off(),
+      system: off(),
+      asr: off(),
+      llm: off(),
+      vision: off(),
+      overlay: off(),
+      protection: off(),
+      network: { state: 'ok', label: t('онлайн') }
+    },
     cost: { usd: 0, unknownPriced: 0, requests: 0 },
     budgetBlocked: null,
     levels: { user: 0, remote: 0 },
@@ -84,6 +95,7 @@ export class SessionManager {
   private inflight = new Map<string, Inflight>()
   private finals: TranscriptSegment[] = []
   private index: Bm25Index | null = null
+  private chunks: Chunk[] = []
   private startedAt = 0
   private persist = true
   private answerUserSource = false
@@ -116,6 +128,7 @@ export class SessionManager {
     }
     Object.assign(this.snap, {
       sessionId: id,
+      startedAt: this.startedAt,
       state: 'listening',
       listening: true,
       activeQuestion: null,
@@ -142,7 +155,7 @@ export class SessionManager {
       this.finals = recent.map((f) => ({ ...f, sessionId: id, startMs: f.startMs + shift, endMs: f.endMs + shift }))
       this.snap.segments = this.finals.slice(-40)
     }
-    this.snap.notice = 'Продолжена прошлая сессия — контекст восстановлен.'
+    this.snap.notice = t('Продолжена прошлая сессия — контекст восстановлен.')
     this.d.emit()
     return id
   }
@@ -151,10 +164,10 @@ export class SessionManager {
     if (!this.snap.sessionId) return
     this.cancelAll()
     if (this.persist) this.d.db.endSession(this.snap.sessionId)
-    Object.assign(this.snap, { sessionId: null, state: 'stopped', listening: false, partial: {}, candidates: [] })
+    Object.assign(this.snap, { sessionId: null, startedAt: null, state: 'stopped', listening: false, partial: {}, candidates: [] })
     // Capture statuses come from the renderer only while it captures; after stop nothing else would reset them, so I do it here.
-    this.snap.status.mic = OFF
-    this.snap.status.system = OFF
+    this.snap.status.mic = off()
+    this.snap.status.system = off()
     this.snap.levels = { user: 0, remote: 0 }
     this.coord = null
     this.startedAt = 0
@@ -184,6 +197,7 @@ export class SessionManager {
 
   reloadKnowledge(): void {
     const chunks = this.d.db.chunksForProfile(this.d.profile().id)
+    this.chunks = chunks
     this.index = chunks.length ? new Bm25Index(chunks) : null
   }
 
@@ -222,6 +236,14 @@ export class SessionManager {
     this.snap.segments = this.finals.slice(-40)
     if (this.persist) this.d.db.addSegment(seg)
     this.handle(this.coord.onUtterance({ source: seg.source, text: seg.text, startMs: seg.startMs, endMs: seg.endMs }), 'auto')
+  }
+
+  /**
+   * Cue mode replaces the sentence + talking points pair with one line of cues, and brings the detailed answer along
+   * right away, so the substance is in view while the user speaks from the cues.
+   */
+  private quickKinds(): AnswerKind[] {
+    return this.d.settings().answerFormat === 'cues' ? ['say', 'deep'] : ['say', 'points']
   }
 
   answerNow(kind: AnswerKind = 'say', trigger: 'manual' | 'hotkey' = 'manual'): void {
@@ -268,14 +290,22 @@ export class SessionManager {
     this.d.emit()
   }
 
-  async screen(image: ChatImage | null, ocrText: string | null, task: ScreenTask, withCode: boolean, codeLang: string): Promise<void> {
+  async screen(image: ChatImage | null, ocrText: string | null, task: ScreenTask, withCode: boolean, codeLang: string, instruction = ''): Promise<void> {
     if (!this.coord) this.start({ mode: 'practice' })
-    const labels: Record<ScreenTask, string> = { explain: 'Объясни условие', approach: 'Предложи подход', review: 'Разбери код' }
-    const decision = this.coord!.manual('manual', `[Экран] ${labels[task]}`)
+    const labels: Record<ScreenTask, string> = {
+      context: 'Вопрос из разговора',
+      custom: 'Своё задание',
+      solve: 'Решить задачу',
+      explain: 'Объясни условие',
+      approach: 'Предложи подход',
+      review: 'Разбери код'
+    }
+    const text = task === 'custom' && instruction.trim() ? instruction.trim().slice(0, 300) : t(labels[task])
+    const decision = this.coord!.manual('manual', t('[Экран] {text}', { text }))
     if (decision.type !== 'new') return
     this.applyQuestion(decision.question)
     this.syncQuestions()
-    this.generate(decision.question, ['screen'], { image, ocrText, task, withCode, codeLang })
+    this.generate(decision.question, ['screen'], { image, ocrText, task, withCode, codeLang, instruction: instruction.trim() })
   }
 
   private handle(dec: Decision, via: 'auto' | 'manual'): void {
@@ -285,12 +315,12 @@ export class SessionManager {
       case 'revise': {
         this.applyQuestion(dec.question)
         const auto = via === 'manual' || s.autoAnswer
-        if (auto) this.generate(dec.question, ['say', 'points'])
+        if (auto) this.generate(dec.question, this.quickKinds())
         else this.snap.state = 'question_confirmed'
         break
       }
       case 'reanswer':
-        this.generate(dec.question, ['say', 'points'])
+        this.generate(dec.question, this.quickKinds())
         break
       case 'expand':
         this.generate(dec.question, ['deep'])
@@ -302,7 +332,7 @@ export class SessionManager {
         this.d.log('duplicate_suppressed', { of: dec.of })
         break
       case 'ignore':
-        if (via === 'manual') this.snap.notice = dec.reason === 'nothing_to_answer' ? 'Пока нечего отвечать — вопрос не распознан' : null
+        if (via === 'manual') this.snap.notice = dec.reason === 'nothing_to_answer' ? t('Пока нечего отвечать — вопрос не распознан') : null
         if (this.snap.state === 'partial_transcript') this.snap.state = this.snap.activeQuestion ? 'answer_ready' : 'listening'
         break
     }
@@ -352,7 +382,7 @@ export class SessionManager {
   private generate(
     q: QuestionEvent,
     kinds: AnswerKind[],
-    screen?: { image: ChatImage | null; ocrText: string | null; task: ScreenTask; withCode: boolean; codeLang: string }
+    screen?: { image: ChatImage | null; ocrText: string | null; task: ScreenTask; withCode: boolean; codeLang: string; instruction?: string }
   ): void {
     const [first, ...rest] = kinds
     this.snap.state = 'generating'
@@ -364,7 +394,7 @@ export class SessionManager {
   private async request(
     q: QuestionEvent,
     kind: AnswerKind,
-    screen?: { image: ChatImage | null; ocrText: string | null; task: ScreenTask; withCode: boolean; codeLang: string },
+    screen?: { image: ChatImage | null; ocrText: string | null; task: ScreenTask; withCode: boolean; codeLang: string; instruction?: string },
     onFirstToken?: () => void
   ): Promise<void> {
     const role: ModelRole = kind === 'deep' ? 'deep_answer' : kind === 'screen' && screen?.image ? 'vision' : 'quick_answer'
@@ -400,7 +430,10 @@ export class SessionManager {
         {
           ...base,
           status: 'error',
-          error: appError('unsupported', role === 'vision' ? 'Модель для изображений не выбрана' : 'Не выбрана модель для ответов — откройте «Провайдеры»')
+          error: appError(
+            'unsupported',
+            role === 'vision' ? t('Модель для изображений не выбрана') : t('Не выбрана модель для ответов — откройте «Провайдеры»')
+          )
         },
         publish
       )
@@ -411,30 +444,42 @@ export class SessionManager {
     const profile = this.d.profile()
     const s = this.d.settings()
     if (!initial.isLocal && s.offline) {
-      this.finish({ ...base, status: 'blocked', error: appError('offline_blocked', 'Офлайн-режим: эта модель работает в облаке') }, publish)
+      this.finish({ ...base, status: 'blocked', error: appError('offline_blocked', t('Офлайн-режим: эта модель работает в облаке')) }, publish)
       onFirstToken?.()
       return
     }
     if (!initial.isLocal && !s.consent.cloud) {
-      this.finish({ ...base, status: 'blocked', error: appError('unsupported', CLOUD_DENIED) }, publish)
+      this.finish({ ...base, status: 'blocked', error: appError('unsupported', cloudDenied()) }, publish)
       onFirstToken?.()
       return
     }
-    const windowStart = q.endMs - s.contextWindowMin * 60_000
-    const knowledge: Chunk[] = this.index ? this.index.search(q.text, 8).map((r) => r.chunk) : []
+    // «Solve it yourself» sends only the capture; «question from the conversation» looks at the last couple of minutes.
+    const isolated = kind === 'screen' && screen?.task === 'solve'
+    const windowMs = kind === 'screen' && screen?.task === 'context' ? SCREEN_CONTEXT_MS : s.contextWindowMin * 60_000
+    const windowStart = q.endMs - windowMs
+    const knowledge: Chunk[] = isolated ? [] : selectKnowledge(this.index, this.chunks, q.text)
     const prompt = buildPrompt({
       question: q.text,
       kind,
       profile,
+      instructions: s.answerInstructions,
+      cues: s.answerFormat === 'cues',
       answerLang: s.answerLang,
-      transcript: this.finals.filter((f) => f.endMs >= windowStart && f.endMs <= q.endMs + 1000),
-      earlierQuestions: (this.coord?.questions ?? [])
+      transcript: isolated ? [] : this.finals.filter((f) => f.endMs >= windowStart && f.endMs <= q.endMs + 1000),
+      earlierQuestions: (isolated ? [] : (this.coord?.questions ?? []))
         .filter((h) => h.questionId !== q.questionId)
         .slice(-8)
         .map((h) => h.text),
       knowledge,
       screen: screen
-        ? { task: screen.task, withCode: screen.withCode, codeLang: screen.codeLang, ocrText: screen.ocrText ?? undefined, image: screen.image ?? undefined }
+        ? {
+            task: screen.task,
+            withCode: screen.withCode,
+            codeLang: screen.codeLang,
+            ocrText: screen.ocrText ?? undefined,
+            image: screen.image ?? undefined,
+            instruction: screen.instruction || undefined
+          }
         : undefined
     })
     base.promptPreset = prompt.preset
@@ -452,7 +497,7 @@ export class SessionManager {
             provider: target.cfg.id,
             model: target.model,
             status: 'blocked',
-            error: appError(money ? 'budget_blocked' : 'rate_limit', money ? gate.reason : 'Лимит запросов приложения — подождите или увеличьте лимит')
+            error: appError(money ? 'budget_blocked' : 'rate_limit', money ? gate.reason : t('Лимит запросов приложения — подождите или увеличьте лимит'))
           },
           publish
         )
@@ -512,7 +557,11 @@ export class SessionManager {
         this.d.outcome?.(target.cfg.id, target.model, false)
         this.d.log('answer_error', { provider: target.cfg.id, model: target.model, code: err.code, status: err.status, detail: err.detail })
         if (fb) {
-          this.snap.notice = `${target.cfg.label}: ${err.message}. Переключено на ${fb.cfg.label} — вы разрешили его как запасной.`
+          this.snap.notice = t('{from}: {error}. Переключено на {to} — вы разрешили его как запасной.', {
+            from: target.cfg.label,
+            error: err.message,
+            to: fb.cfg.label
+          })
           target = fb
           fellBack = true
           continue

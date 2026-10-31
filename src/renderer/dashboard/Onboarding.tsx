@@ -32,9 +32,7 @@ export function Onboarding({ ctx, asr }: { ctx: Ctx; asr: AsrStatus | null }) {
             </span>
             <span>Copilot</span>
           </div>
-          <span className="faint small">
-            Шаг {step + 1} из {STEPS.length}
-          </span>
+          <span className="faint small">{t('Шаг {n} из {total}', { n: step + 1, total: STEPS.length })}</span>
         </div>
         <div className="onb-steps">
           {STEPS.map((s, i) => (
@@ -82,12 +80,13 @@ function StepLang({ ctx }: { ctx: Ctx }) {
     <div className="col" style={{ gap: 16 }}>
       <h1>{t('Добро пожаловать в Copilot')}</h1>
       <p className="muted" style={{ margin: 0 }}>
-        Помощник слушает разговор, вовремя замечает вопрос и показывает короткий ответ с опорой на ваше резюме. Распознавание речи — на этом компьютере, модель
-        для ответов вы выбираете сами.
+        {t(
+          'Помощник слушает разговор, вовремя замечает вопрос и показывает короткий ответ с опорой на ваше резюме. Распознавание речи — на этом компьютере, модель для ответов вы выбираете сами.'
+        )}
       </p>
       <div className="grid2">
         <label className="field">
-          <span>Язык интерфейса</span>
+          <span>{t('Язык интерфейса')}</span>
           <select
             className="input"
             value={ctx.settings.uiLang}
@@ -102,22 +101,22 @@ function StepLang({ ctx }: { ctx: Ctx }) {
           </select>
         </label>
         <label className="field">
-          <span>Язык ответов</span>
+          <span>{t('Язык ответов')}</span>
           <select className="input" value={ctx.settings.answerLang} onChange={(e) => void ctx.patch({ answerLang: e.target.value as 'auto' })}>
-            <option value="auto">Как в вопросе</option>
+            <option value="auto">{t('Как в вопросе')}</option>
             <option value="ru">Русский</option>
             <option value="uk">Українська</option>
             <option value="en">English</option>
           </select>
         </label>
         <label className="field">
-          <span>Язык разговора</span>
+          <span>{t('Язык разговора')}</span>
           <select className="input" value={ctx.settings.asr.language} onChange={(e) => void ctx.patch({ asr: { language: e.target.value as 'auto' } })}>
             {ASR_LANG_OPTIONS}
           </select>
         </label>
       </div>
-      <div className="small faint">Займёт около 3 минут. Любой шаг можно пропустить и настроить позже.</div>
+      <div className="small faint">{t('Займёт около 3 минут. Любой шаг можно пропустить и настроить позже.')}</div>
     </div>
   )
 }
@@ -125,9 +124,9 @@ function StepLang({ ctx }: { ctx: Ctx }) {
 function StepAudio({ ctx }: { ctx: Ctx }) {
   return (
     <div className="col" style={{ gap: 14 }}>
-      <h2>Звук: вы и собеседник — раздельно</h2>
+      <h2>{t('Звук: вы и собеседник — раздельно')}</h2>
       <p className="muted small" style={{ margin: 0 }}>
-        Микрофон — это вы. Системный звук — голос собеседника из Zoom, Meet, Teams или браузера. Подсказки строятся по речи собеседника.
+        {t('Микрофон — это вы. Системный звук — голос собеседника из Zoom, Meet, Teams или браузера. Подсказки строятся по речи собеседника.')}
       </p>
       <DeviceSettings ctx={ctx} />
     </div>
@@ -137,13 +136,14 @@ function StepAudio({ ctx }: { ctx: Ctx }) {
 function StepAsr({ ctx, asr }: { ctx: Ctx; asr: AsrStatus | null }) {
   return (
     <div className="col" style={{ gap: 14 }}>
-      <h2>Распознавание речи</h2>
+      <h2>{t('Распознавание речи')}</h2>
       <p className="muted small" style={{ margin: 0 }}>
-        Работает локально (whisper.cpp): аудио не покидает компьютер. Нужно один раз скачать движок и модель — размер и проверка контрольной суммы показаны
-        ниже.
+        {t(
+          'Работает локально (whisper.cpp): аудио не покидает компьютер. Нужно один раз скачать движок и модель — размер и проверка контрольной суммы показаны ниже.'
+        )}
       </p>
       <AsrInstaller ctx={ctx} asr={asr} compact />
-      <div className="small faint">Без распознавания можно вводить вопросы текстом.</div>
+      <div className="small faint">{t('Без распознавания можно вводить вопросы текстом.')}</div>
     </div>
   )
 }
@@ -165,9 +165,9 @@ function StepModel({ ctx }: { ctx: Ctx }) {
 
   return (
     <div className="col" style={{ gap: 14 }}>
-      <h2>Модель для ответов</h2>
+      <h2>{t('Модель для ответов')}</h2>
       <p className="muted small" style={{ margin: 0 }}>
-        Свой ключ (BYOK) или локальная модель. Ollama работает без интернета и без ключа.
+        {t('Свой ключ (BYOK) или локальная модель. Ollama работает без интернета и без ключа.')}
       </p>
       {(!providers?.length || adding) && (
         <ProviderForm
@@ -184,7 +184,7 @@ function StepModel({ ctx }: { ctx: Ctx }) {
           <div className="row">
             <b className="grow">{p.label}</b>
             <button className="btn sm ghost" onClick={() => setAdding(true)}>
-              Другой провайдер
+              {t('Другой провайдер')}
             </button>
           </div>
           <ModelSelect providerId={p.id} value={quick?.providerId === p.id ? quick.model : ''} onChange={(m) => void choose(p, m)} />
@@ -200,11 +200,11 @@ function StepModel({ ctx }: { ctx: Ctx }) {
               }
             }}
           >
-            {busy ? 'Проверяю текст и изображение…' : 'Проверить соединение'}
+            {busy ? t('Проверяю текст и изображение…') : t('Проверить соединение')}
           </button>
           <TestResult r={test} />
           {test?.vision && !test.vision.ok && (
-            <div className="small muted">Снимки экрана будут распознаваться локальным OCR. Отдельную vision-модель можно выбрать в настройках.</div>
+            <div className="small muted">{t('Снимки экрана будут распознаваться локальным OCR. Отдельную vision-модель можно выбрать в настройках.')}</div>
           )}
         </div>
       )}
@@ -224,11 +224,11 @@ function StepProfile({ ctx }: { ctx: Ctx }) {
   }
   return (
     <div className="col" style={{ gap: 14 }}>
-      <h2>Профиль</h2>
+      <h2>{t('Профиль')}</h2>
       <div className="preset-grid">
         {(Object.keys(PRESET_LABEL) as Profile['preset'][]).map((k) => (
           <button key={k} className={`preset ${p.preset === k ? 'on' : ''}`} onClick={() => void setPreset(k)}>
-            <b>{PRESET_LABEL[k]}</b>
+            <b>{t(PRESET_LABEL[k])}</b>
           </button>
         ))}
       </div>
@@ -245,7 +245,7 @@ function StepProfile({ ctx }: { ctx: Ctx }) {
             }
           }}
         >
-          Загрузить резюме (PDF/DOCX/TXT)
+          {t('Загрузить резюме (PDF/DOCX/TXT)')}
         </button>
         <button
           className="btn ghost"
@@ -254,16 +254,16 @@ function StepProfile({ ctx }: { ctx: Ctx }) {
             reloadDocs()
           }}
         >
-          Описание вакансии
+          {t('Описание вакансии')}
         </button>
       </div>
       {err && <div className="banner error small">{err}</div>}
       {docs?.map((d) => (
         <div key={d.id} className="small">
-          ✓ {d.name} — {d.chunks} фрагм.
+          ✓ {d.name} — {t('{n} фрагм.', { n: d.chunks })}
         </div>
       ))}
-      <div className="small muted">Ответы о вашем опыте строятся только на загруженных фактах. Чего нет в резюме, приложение не придумывает.</div>
+      <div className="small muted">{t('Ответы о вашем опыте строятся только на загруженных фактах. Чего нет в резюме, приложение не придумывает.')}</div>
     </div>
   )
 }
@@ -289,9 +289,9 @@ function StepTest({ ctx }: { ctx: Ctx }) {
   const a = snap?.answers.say
   return (
     <div className="col" style={{ gap: 14 }}>
-      <h2>Проверка за 30 секунд</h2>
+      <h2>{t('Проверка за 30 секунд')}</h2>
       <p className="muted small" style={{ margin: 0 }}>
-        Нажмите «Начать» и задайте вопрос вслух, например: «Что такое идемпотентность в REST?» — или введите его. Появится окно подсказок.
+        {t('Нажмите «Начать» и задайте вопрос вслух, например: «Что такое идемпотентность в REST?» — или введите его. Появится окно подсказок.')}
       </p>
       <div className="row">
         <button
@@ -302,7 +302,7 @@ function StepTest({ ctx }: { ctx: Ctx }) {
             setLeft(30)
           }}
         >
-          {left && left > 0 ? `Идёт проверка… ${left} с` : 'Начать'}
+          {left && left > 0 ? t('Идёт проверка… {n} с', { n: left }) : t('Начать')}
         </button>
         <input
           className="input grow"
@@ -314,14 +314,16 @@ function StepTest({ ctx }: { ctx: Ctx }) {
       </div>
       {snap && (
         <div className="card col" style={{ background: 'var(--surface-2)' }}>
-          <div className="small muted">Распознано: {snap.partial.user || snap.segments.at(-1)?.text || '—'}</div>
+          <div className="small muted">
+            {t('Распознано:')} {snap.partial.user || snap.segments.at(-1)?.text || '—'}
+          </div>
           {snap.activeQuestion && <b>{snap.activeQuestion.text}</b>}
           {a && (
             <div style={{ fontSize: 17 }}>
               {a.text || '…'}
               {a.firstTokenMs != null && (
                 <div className="faint small">
-                  {a.provider} · {a.model} · первый токен {(a.firstTokenMs / 1000).toFixed(1)} с
+                  {a.provider} · {a.model} · {t('первый токен {s} с', { s: (a.firstTokenMs / 1000).toFixed(1) })}
                 </div>
               )}
               {a.error && (
@@ -353,30 +355,31 @@ function StepConsent({ ctx, started }: { ctx: Ctx; started: number }) {
   }
   return (
     <div className="col" style={{ gap: 14 }}>
-      <h2>Последнее: согласие и честность</h2>
+      <h2>{t('Последнее: согласие и честность')}</h2>
       <div className="banner">
-        Записывать звук и использовать AI-подсказки можно только там, где это разрешено правилами и участники согласны. Copilot не обходит прокторинг и средства
-        контроля и не обещает невидимости.
+        {t(
+          'Записывать звук и использовать AI-подсказки можно только там, где это разрешено правилами и участники согласны. Copilot не обходит прокторинг и средства контроля и не обещает невидимости.'
+        )}
       </div>
       <Toggle
         on={c.history}
         onChange={(v) => void ctx.patch({ consent: { history: v } })}
-        label="Сохранять историю сессий на этом компьютере"
-        hint="Можно удалить в любой момент. Без истории нет восстановления после сбоя."
+        label={t('Сохранять историю сессий на этом компьютере')}
+        hint={t('Можно удалить в любой момент. Без истории нет восстановления после сбоя.')}
       />
-      <Toggle on={c.screen} onChange={(v) => void ctx.patch({ consent: { screen: v } })} label="Разрешить снимки экрана по моей команде" />
+      <Toggle on={c.screen} onChange={(v) => void ctx.patch({ consent: { screen: v } })} label={t('Разрешить снимки экрана по моей команде')} />
       <Toggle
         on={c.cloud}
         onChange={(v) => void ctx.patch({ consent: { cloud: v } })}
-        label="Разрешить отправку в облачную модель"
-        hint="Нужно, только если модель для ответов — не на этом компьютере. Уходит вопрос, недавний транскрипт и подходящие фрагменты документов."
+        label={t('Разрешить отправку в облачную модель')}
+        hint={t('Нужно, только если модель для ответов — не на этом компьютере. Уходит вопрос, недавний транскрипт и подходящие фрагменты документов.')}
       />
       <label className="row">
         <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-        <span>Я понимаю и буду сообщать участникам о записи и AI-обработке</span>
+        <span>{t('Я понимаю и буду сообщать участникам о записи и AI-обработке')}</span>
       </label>
       <div className="row">
-        <span className="faint small grow">Настройка заняла {Math.max(1, Math.round((Date.now() - started) / 60000))} мин.</span>
+        <span className="faint small grow">{t('Настройка заняла {n} мин.', { n: Math.max(1, Math.round((Date.now() - started) / 60000)) })}</span>
         <button className="btn primary" disabled={!agree} onClick={() => void finish()}>
           {t('Готово')}
         </button>

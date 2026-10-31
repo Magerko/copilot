@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import type { AnswerEvent, AppSnapshot } from '@shared/types'
 import { api } from '../lib/api'
 import { t } from '../lib/i18n'
-import { Markdown } from '../lib/md'
+import { pretty } from '../lib/keys'
+import { Markdown, MarkdownInline } from '../lib/md'
 import type { Ctx } from './App'
-import { pretty } from './Home'
 import { Meter } from './ui'
 
 function Prov({ a }: { a?: AnswerEvent }) {
@@ -12,10 +12,10 @@ function Prov({ a }: { a?: AnswerEvent }) {
   return (
     <div className="faint small">
       {a.provider} · {a.model}
-      {a.firstTokenMs != null && ` · первый токен ${(a.firstTokenMs / 1000).toFixed(1)} с`}
+      {a.firstTokenMs != null && ` · ${t('первый токен {s} с', { s: (a.firstTokenMs / 1000).toFixed(1) })}`}
       {a.status === 'done' &&
-        (a.usageCostUsd == null ? ` · ${t('Цена неизвестна')}` : a.usageCostUsd === 0 ? ' · локально, бесплатно' : ` · $${a.usageCostUsd.toFixed(4)}`)}
-      {a.usage && !a.usage.exact && ' · токены оценочно'}
+        (a.usageCostUsd == null ? ` · ${t('Цена неизвестна')}` : a.usageCostUsd === 0 ? ` · ${t('локально, бесплатно')}` : ` · $${a.usageCostUsd.toFixed(4)}`)}
+      {a.usage && !a.usage.exact && ` · ${t('токены оценочно')}`}
     </div>
   )
 }
@@ -56,9 +56,9 @@ export function Live({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
             </button>
             <span className="grow" />
             <div className="levels">
-              <span className="small muted">Я</span>
+              <span className="small muted">{t('Я')}</span>
               <Meter value={snap.levels.user} />
-              <span className="small muted">Собеседник</span>
+              <span className="small muted">{t('Собеседник')}</span>
               <Meter value={snap.levels.remote} />
             </div>
             <button className="btn" onClick={() => void api.session.toggleListen()}>
@@ -87,27 +87,31 @@ export function Live({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
       <div className="live-grid">
         <section className="card col transcript">
           <div className="row between">
-            <h2>Транскрипт</h2>
-            <span className="faint small">локально · последние {ctx.settings.contextWindowMin} мин идут в контекст</span>
+            <h2>{t('Транскрипт')}</h2>
+            <span className="faint small">{t('локально · последние {n} мин идут в контекст', { n: ctx.settings.contextWindowMin })}</span>
           </div>
           <div className="scroll tr-list" ref={tr}>
             {snap.segments.map((s) => (
               <div key={s.segmentId} className={`tr ${s.source}`}>
-                <span className="tr-who">{s.source === 'remote' ? 'Собеседник' : 'Я'}</span>
+                <span className="tr-who">{s.source === 'remote' ? t('Собеседник') : t('Я')}</span>
                 <span>{s.text}</span>
               </div>
             ))}
             {(['remote', 'user'] as const).map((src) =>
               snap.partial[src] ? (
                 <div key={src} className={`tr ${src} partial`}>
-                  <span className="tr-who">{src === 'remote' ? 'Собеседник' : 'Я'}</span>
+                  <span className="tr-who">{src === 'remote' ? t('Собеседник') : t('Я')}</span>
                   <span>{snap.partial[src]}</span>
                 </div>
               ) : null
             )}
             {!snap.segments.length && !snap.partial.remote && !snap.partial.user && (
               <div className="faint small">
-                {snap.sessionId ? (snap.listening ? 'Слушаю… Говорите или включите звук собеседника.' : 'Пауза.') : 'Здесь появится распознанная речь.'}
+                {snap.sessionId
+                  ? snap.listening
+                    ? t('Слушаю… Говорите или включите звук собеседника.')
+                    : t('Пауза.')
+                  : t('Здесь появится распознанная речь.')}
               </div>
             )}
           </div>
@@ -128,9 +132,11 @@ export function Live({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
         <section className="card col answer">
           {snap.budgetBlocked && (
             <div className="banner error row between">
-              <span>{snap.budgetBlocked}. Новые платные запросы остановлены до вашего решения.</span>
+              <span>
+                {snap.budgetBlocked}. {t('Новые платные запросы остановлены до вашего решения.')}
+              </span>
               <button className="btn sm" onClick={() => void api.approveBudget()}>
-                Продолжить сверх лимита
+                {t('Продолжить сверх лимита')}
               </button>
             </div>
           )}
@@ -156,11 +162,12 @@ export function Live({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
               <div className="col" style={{ gap: 4 }}>
                 <div className="row between">
                   <span className="small muted">
-                    {t('Вопрос')} {q.revision > 1 ? `· ревизия ${q.revision}` : ''} · {q.source === 'remote' ? 'собеседник' : 'вы'} · {q.kind}
+                    {t('Вопрос')} {q.revision > 1 ? `· ${t('ревизия {n}', { n: q.revision })}` : ''} · {q.source === 'remote' ? t('собеседник') : t('вы')} ·{' '}
+                    {q.kind}
                   </span>
                   {editing === null ? (
-                    <button className="btn ghost sm" onClick={() => setEditing(q.text)} title="Если распознано неверно">
-                      Исправить
+                    <button className="btn ghost sm" onClick={() => setEditing(q.text)} title={t('Если распознано неверно')}>
+                      {t('Исправить')}
                     </button>
                   ) : null}
                 </div>
@@ -174,7 +181,7 @@ export function Live({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
                       onKeyDown={(e) => e.key === 'Enter' && (void api.session.edit(editing), setEditing(null))}
                     />
                     <button className="btn sm" onClick={() => (void api.session.edit(editing), setEditing(null))}>
-                      Ответить на исправленный
+                      {t('Ответить на исправленный')}
                     </button>
                     <button className="btn sm ghost" onClick={() => setEditing(null)}>
                       {t('Отмена')}
@@ -187,7 +194,7 @@ export function Live({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
 
               {(a.say || a.screen) && (
                 <div className="ans-say">
-                  {a.screen ? <Markdown text={a.screen.text} /> : a.say!.text || '…'}
+                  {a.screen ? <Markdown text={a.screen.text} /> : a.say!.text ? <MarkdownInline text={a.say!.text} /> : '…'}
                   <Prov a={a.screen ?? a.say} />
                   {(a.say ?? a.screen)?.error && (
                     <div className="banner error small">
@@ -213,26 +220,26 @@ export function Live({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
               )}
               {snap.state === 'question_confirmed' && !a.say && (
                 <div className="banner">
-                  Вопрос распознан. Автоответ выключен —{' '}
+                  {t('Вопрос распознан. Автоответ выключен —')}{' '}
                   <button className="btn sm primary" onClick={() => void api.session.answerNow()}>
                     {t('Ответить')}
                   </button>{' '}
-                  или <kbd>{pretty(ctx.settings.shortcuts.answerNow)}</kbd>
+                  {t('или')} <kbd>{pretty(ctx.settings.shortcuts.answerNow)}</kbd>
                 </div>
               )}
             </>
           ) : (
             <div className="empty muted">
               <div style={{ fontSize: 34, marginBottom: 6 }}>❝</div>
-              {snap.sessionId ? 'Как только прозвучит вопрос — здесь появится ответ.' : 'Начните сессию или задайте вопрос текстом слева.'}
+              {snap.sessionId ? t('Как только прозвучит вопрос — здесь появится ответ.') : t('Начните сессию или задайте вопрос текстом слева.')}
             </div>
           )}
 
           <div className="grow" />
           <div className="faint small row between">
             <span>
-              Расход сессии: {snap.cost.usd == null ? '—' : `$${snap.cost.usd.toFixed(4)}`} · запросов {snap.cost.requests}
-              {snap.cost.unknownPriced > 0 && ` · ${snap.cost.unknownPriced} без цены (лимит $ для них не контролируется)`}
+              {t('Расход сессии: {usd} · запросов {n}', { usd: snap.cost.usd == null ? '—' : `$${snap.cost.usd.toFixed(4)}`, n: snap.cost.requests })}
+              {snap.cost.unknownPriced > 0 && ` · ${t('{n} без цены (лимит $ для них не контролируется)', { n: snap.cost.unknownPriced })}`}
             </span>
           </div>
         </section>

@@ -13,10 +13,12 @@ import type {
   ResumableSession,
   ScreenTask,
   SessionSummary,
-  Settings
+  Settings,
+  UiLang
 } from '@shared/types'
 
 interface Bridge {
+  platform: string
   invoke<T>(channel: string, ...args: unknown[]): Promise<T>
   onSnapshot(cb: (s: AppSnapshot) => void): () => void
   onSettings(cb: (s: Settings) => void): () => void
@@ -24,6 +26,7 @@ interface Bridge {
   onCapture(cb: (m: CaptureMsg) => void): () => void
   onScroll(cb: (dir: number) => void): () => void
   onPickerInit(cb: (m: PickerInit) => void): () => void
+  onTyping(cb: (on: boolean) => void): () => void
   sendAudio(m: unknown): void
   sendLevel(m: unknown): void
   sendAudioStatus(m: unknown): void
@@ -35,6 +38,7 @@ export interface PickerInit {
   scale: number
   hasVision: boolean
   ocr: boolean
+  uiLang: UiLang
 }
 
 export interface PresetInfo {
@@ -57,6 +61,13 @@ export interface InitialState {
   version: string
 }
 
+export type MediaAccess = 'granted' | 'denied' | 'restricted' | 'not-determined' | 'unknown'
+export interface MediaAccessReport {
+  gated: boolean
+  microphone: MediaAccess
+  screen: MediaAccess
+}
+
 export interface ProviderTestReport {
   models: { ok: true; latencyMs: number; models: number } | { ok: false; error: { code: string; message: string; detail?: string } }
   text: { ok: boolean; ms: number | null; sample?: string; error?: string } | null
@@ -65,6 +76,7 @@ export interface ProviderTestReport {
 
 export const km = (window as unknown as { km: Bridge }).km
 const call = km.invoke
+export const isMac = km.platform === 'darwin'
 
 export const api = {
   state: () => call<InitialState>('km:getState'),
@@ -93,13 +105,16 @@ export const api = {
   preview: () => call<OutgoingPreview>('km:preview'),
   overlay: {
     toggle: () => call<void>('km:overlay:toggle'),
+    underCamera: () => call<void>('km:overlay:underCamera'),
+    typing: (on: boolean) => call<void>('km:overlay:typing', on),
     expand: (v: boolean) => call<void>('km:overlay:expand', v),
     fit: (h: number) => call<void>('km:overlay:fit', h)
   },
   copy: (text: string) => call<void>('km:copy', text),
   screen: {
     begin: () => call<void>('km:screen:begin'),
-    submit: (png: string, task: ScreenTask, withCode: boolean, codeLang: string) => call<void>('km:screen:submit', png, task, withCode, codeLang),
+    submit: (png: string, task: ScreenTask, withCode: boolean, codeLang: string, instruction = '') =>
+      call<void>('km:screen:submit', png, task, withCode, codeLang, instruction),
     cancel: () => call<void>('km:screen:cancel')
   },
   profiles: {
@@ -132,6 +147,10 @@ export const api = {
   },
   installOcr: () => call<void>('km:ocr:install'),
   hasNvidia: () => call<boolean>('km:gpu'),
+  media: {
+    access: () => call<MediaAccessReport>('km:media:access'),
+    openPrivacy: (kind: 'microphone' | 'screen') => call<void>('km:media:openPrivacy', kind)
+  },
   diagnostics: () => call<DiagReport>('km:diagnostics'),
   diagLog: () => call<{ at: number; kind: string; data: string }[]>('km:diagnostics:log'),
   open: (url: string) => call<void>('km:open', url)

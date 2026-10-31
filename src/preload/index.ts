@@ -18,12 +18,14 @@ function on(channel: string) {
 
 const api = {
   invoke,
+  platform: process.platform,
   onSnapshot: on('km:snapshot'),
   onSettings: on('km:settings'),
   onAsr: on('km:asr'),
   onCapture: on('km:capture'),
   onScroll: on('km:scroll'),
   onPickerInit: on('km:picker-init'),
+  onTyping: on('km:typing'),
   sendAudio: (m: unknown) => ipcRenderer.send('km:audio', m),
   sendLevel: (m: unknown) => ipcRenderer.send('km:level', m),
   sendAudioStatus: (m: unknown) => ipcRenderer.send('km:audio-status', m)

@@ -3,6 +3,7 @@ import type { AppSnapshot, SessionStartOptions } from '@shared/types'
 import { api } from '../lib/api'
 import { useAsync } from '../lib/hooks'
 import { t } from '../lib/i18n'
+import { pretty } from '../lib/keys'
 import type { Ctx } from './App'
 import { fmtDate, Status } from './ui'
 
@@ -22,7 +23,7 @@ export function Home({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
       {snap.notice && !snap.sessionId && <div className="banner warn">{snap.notice}</div>}
       <section className="hero card">
         <div className="col grow" style={{ gap: 12 }}>
-          <h1>{snap.sessionId ? 'Сессия идёт' : 'Готовы к разговору?'}</h1>
+          <h1>{snap.sessionId ? t('Сессия идёт') : t('Готовы к разговору?')}</h1>
           <div className="row wrap" style={{ gap: 8 }}>
             {(
               [
@@ -38,16 +39,16 @@ export function Home({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
           </div>
           <div className="small muted">
             {mode === 'practice'
-              ? 'Вопросы можно читать вслух самому или вводить текстом — подсказки на ваш голос тоже.'
+              ? t('Вопросы можно читать вслух самому или вводить текстом — подсказки на ваш голос тоже.')
               : mode === 'live'
-                ? 'Подсказки только на речь собеседника (системный звук). Ваш голос — в транскрипт и контекст.'
-                : 'Без подсказок: транскрипт встречи и вопросы сохраняются локально.'}
+                ? t('Подсказки только на речь собеседника (системный звук). Ваш голос — в транскрипт и контекст.')
+                : t('Без подсказок: транскрипт встречи и вопросы сохраняются локально.')}
           </div>
           <div className="row wrap" style={{ gap: 10, marginTop: 4 }}>
             {snap.sessionId ? (
               <>
                 <button className="btn big" onClick={() => ctx.go('live')}>
-                  Открыть сессию
+                  {t('Открыть сессию')}
                 </button>
                 <button className="btn big" onClick={() => void api.session.stop()}>
                   {t('Завершить')}
@@ -61,7 +62,7 @@ export function Home({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
                 {ctx.init.resumable && (
                   <button
                     className="btn big"
-                    title={`${ctx.init.resumable.title} · ${ctx.init.resumable.segments} реплик`}
+                    title={t('{title} · реплик: {n}', { title: ctx.init.resumable.title, n: ctx.init.resumable.segments })}
                     onClick={() => void api.session.resume().then(() => ctx.go('live'))}
                   >
                     {t('Продолжить прошлую сессию')}
@@ -75,7 +76,7 @@ export function Home({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
               value={s.activeProfileId}
               onChange={(e) => void ctx.patch({ activeProfileId: e.target.value })}
               disabled={!!snap.sessionId}
-              aria-label="Профиль"
+              aria-label={t('Профиль')}
             >
               {(profiles ?? []).map((p) => (
                 <option key={p.id} value={p.id}>
@@ -88,18 +89,18 @@ export function Home({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
             <div className="banner warn small">
               {noAsr && (
                 <div>
-                  Распознавание речи не установлено.{' '}
+                  {t('Распознавание речи не установлено.')}{' '}
                   <a href="#" onClick={() => ctx.go('settings', 'audio')}>
-                    Установить
+                    {t('Установить')}
                   </a>{' '}
-                  — или задавайте вопросы текстом.
+                  {t('— или задавайте вопросы текстом.')}
                 </div>
               )}
               {noModel && (
                 <div>
-                  Не выбрана модель для ответов.{' '}
+                  {t('Не выбрана модель для ответов.')}{' '}
                   <a href="#" onClick={() => ctx.go('settings', 'providers')}>
-                    Подключить провайдера
+                    {t('Подключить провайдера')}
                   </a>
                 </div>
               )}
@@ -125,14 +126,14 @@ export function Home({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
             <div className="col" style={{ gap: 6 }}>
               {preview.recipients.map((r) => (
                 <div key={r.baseUrl} className="row small">
-                  <span className={`chip ${r.local ? '' : 'accent'}`}>{r.local ? 'на этом ПК' : 'облако'}</span>
+                  <span className={`chip ${r.local ? '' : 'accent'}`}>{r.local ? t('на этом ПК') : t('облако')}</span>
                   <b>{r.label}</b>
                   <span className="faint mono">{new URL(r.baseUrl).host}</span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="muted small">Провайдер не выбран — никуда.</div>
+            <div className="muted small">{t('Провайдер не выбран — никуда.')}</div>
           )}
           <ul className="small muted" style={{ margin: 0, paddingLeft: 18 }}>
             {preview?.items.map((i) => (
@@ -142,19 +143,19 @@ export function Home({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
         </section>
 
         <section className="card col">
-          <h2>Горячие клавиши</h2>
+          <h2>{t('Горячие клавиши')}</h2>
           <div className="keys small">
-            <span>Показать/скрыть подсказки</span>
+            <span>{t('Показать/скрыть подсказки')}</span>
             <kbd>{pretty(keys.toggleOverlay)}</kbd>
-            <span>Ответить сейчас</span>
+            <span>{t('Ответить сейчас')}</span>
             <kbd>{pretty(keys.answerNow)}</kbd>
-            <span>Пауза / продолжить</span>
+            <span>{t('Пауза / продолжить')}</span>
             <kbd>{pretty(keys.toggleListen)}</kbd>
-            <span>Снимок области экрана</span>
+            <span>{t('Снимок области экрана')}</span>
             <kbd>{pretty(keys.snapRegion)}</kbd>
-            <span>Развернуть / подробно</span>
+            <span>{t('Развернуть / подробно')}</span>
             <kbd>{pretty(keys.expand)}</kbd>
-            <span>Аварийная остановка</span>
+            <span>{t('Аварийная остановка')}</span>
             <kbd>{pretty(keys.panic)}</kbd>
           </div>
         </section>
@@ -164,7 +165,7 @@ export function Home({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
         <div className="row between">
           <h2>{t('Последние сессии')}</h2>
           <button className="btn ghost sm" onClick={() => ctx.go('history')}>
-            Вся история →
+            {t('Вся история →')}
           </button>
         </div>
         {sessions?.length ? (
@@ -175,19 +176,17 @@ export function Home({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
                   {fmtDate(x.startedAt)}
                 </span>
                 <span className="grow">{x.title}</span>
-                <span className="muted">{x.questions} вопр.</span>
-                {x.status === 'interrupted' && <span className="chip">прервана</span>}
+                <span className="muted">{t('{n} вопр.', { n: x.questions })}</span>
+                {x.status === 'interrupted' && <span className="chip">{t('прервана')}</span>}
               </div>
             ))}
           </div>
         ) : (
-          <div className="muted small">Пока нет. {s.history && s.consent.history ? '' : 'Сохранение истории выключено.'}</div>
+          <div className="muted small">
+            {t('Пока нет.')} {s.history && s.consent.history ? '' : t('Сохранение истории выключено.')}
+          </div>
         )}
       </section>
     </div>
   )
-}
-
-export function pretty(accel: string): string {
-  return accel.replace('Control', 'Ctrl').replace(/\+/g, ' + ')
 }

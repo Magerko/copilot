@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { AsrStatus, Lang, Source } from '@shared/types'
-import { api } from '../../lib/api'
+import { api, isMac, type MediaAccessReport } from '../../lib/api'
 import { probeLevel } from '../../lib/audio'
+import { t } from '../../lib/i18n'
 import type { Ctx } from '../App'
 import { ErrorText, Meter, Toggle } from '../ui'
 
-const ASR_OPTIONS = [
+const WIN_ASR_OPTIONS = [
   { backend: 'cpu' as const, model: 'base', title: 'Быстрый (процессор)', size: '≈160 МБ', note: '≈1 с на фразу на CPU. Подходит всем.' },
   { backend: 'cpu' as const, model: 'small', title: 'Точнее (процессор)', size: '≈500 МБ', note: '≈2 с на фразу — медленнее, но лучше на акцентах.' },
   {
@@ -17,22 +18,41 @@ const ASR_OPTIONS = [
   }
 ]
 
+// whisper.cpp on Apple Silicon runs on Metal regardless of backend, so I keep 'cpu' as the stored value and drop CUDA.
+const MAC_ASR_OPTIONS = [
+  { backend: 'cpu' as const, model: 'base', title: 'Быстрый', size: '≈150 МБ', note: 'Metal на Apple Silicon — доли секунды на фразу.' },
+  { backend: 'cpu' as const, model: 'small', title: 'Точнее', size: '≈490 МБ', note: 'Лучше на акцентах, всё ещё быстро на M-серии.' },
+  {
+    backend: 'cpu' as const,
+    model: 'turbo',
+    title: 'Максимум',
+    size: '≈580 МБ',
+    note: 'Large v3 Turbo — лучшая точность. После запуска движка — несколько секунд на прогрев.'
+  }
+]
+
+const ASR_OPTIONS = isMac ? MAC_ASR_OPTIONS : WIN_ASR_OPTIONS
+
 // A fixed language is ~1.5× faster on CPU (spike S2, audit 2026-10-28) and never turns speech into a translation.
-export const ASR_LANG_OPTIONS = (
-  <>
-    <option value="ru">Русский</option>
-    <option value="uk">Українська</option>
-    <option value="en">English</option>
-    <option value="auto">Смешанный — автоопределение (медленнее)</option>
-  </>
-)
+// Language names stay in their own language; the element is built once, so the label is translated when it renders.
+function AsrLangOptions() {
+  return (
+    <>
+      <option value="ru">Русский</option>
+      <option value="uk">Українська</option>
+      <option value="en">English</option>
+      <option value="auto">{t('Смешанный — автоопределение (медленнее)')}</option>
+    </>
+  )
+}
+export const ASR_LANG_OPTIONS = <AsrLangOptions />
 
 export function AsrInstaller({ ctx, asr, compact }: { ctx: Ctx; asr: AsrStatus | null; compact?: boolean }) {
   const [nvidia, setNvidia] = useState<boolean | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   useEffect(() => {
-    void api.hasNvidia().then(setNvidia)
+    if (!isMac) void api.hasNvidia().then(setNvidia)
   }, [])
   const cur = ctx.settings.asr
   const dl = asr?.download
@@ -51,6 +71,12 @@ export function AsrInstaller({ ctx, asr, compact }: { ctx: Ctx; asr: AsrStatus |
 
   return (
     <div className="col">
+      {isMac && asr && !asr.binary && (
+        <div className="small muted">
+          {t('На macOS движок ставится отдельно:')} <code>brew install whisper-cpp</code> {t('(собран с Metal) или')} <code>scripts/build-whisper-mac.sh</code>.{' '}
+          {t('Модель приложение скачает само.')}
+        </div>
+      )}
       <div className="asr-grid">
         {ASR_OPTIONS.filter((o) => !compact || o.model !== 'small').map((o) => {
           const active = cur.backend === o.backend && cur.model === o.model
@@ -58,14 +84,14 @@ export function AsrInstaller({ ctx, asr, compact }: { ctx: Ctx; asr: AsrStatus |
           const disabled = busy || (o.backend === 'cuda' && nvidia === false)
           return (
             <div key={o.model} className={`asr-opt ${active ? 'on' : ''}`}>
-              <b>{o.title}</b>
-              <span className="small muted">{o.note}</span>
+              <b>{t(o.title)}</b>
+              <span className="small muted">{t(o.note)}</span>
               <span className="small faint">
-                Загрузка {o.size}
-                {o.backend === 'cuda' && nvidia === false ? ' · NVIDIA не найдена' : ''}
+                {t('Загрузка {size}', { size: t(o.size) })}
+                {o.backend === 'cuda' && nvidia === false ? ' · ' + t('NVIDIA не найдена') : ''}
               </span>
               <button className={`btn sm ${active ? '' : 'primary'}`} disabled={disabled || !!ready} onClick={() => void install(o.backend, o.model)}>
-                {ready ? 'Установлено' : active ? 'Доустановить' : 'Установить и выбрать'}
+                {ready ? t('Установлено') : active ? t('Доустановить') : t('Установить и выбрать')}
               </button>
             </div>
           )
@@ -74,15 +100,49 @@ export function AsrInstaller({ ctx, asr, compact }: { ctx: Ctx; asr: AsrStatus |
       {dl && (
         <div className="col" style={{ gap: 4 }}>
           <div className="small">
-            Загрузка: {dl.name} — {Math.round(dl.received / 1048576)} / {dl.total ? Math.round(dl.total / 1048576) : '?'} МБ
+            {t('Загрузка: {name} — {got} / {total} МБ', {
+              name: dl.name,
+              got: Math.round(dl.received / 1048576),
+              total: dl.total ? Math.round(dl.total / 1048576) : '?'
+            })}
           </div>
           <div className="meter">
             <i style={{ width: `${dl.total ? (dl.received / dl.total) * 100 : 5}%`, background: 'var(--info)' }} />
           </div>
-          <div className="small faint">Модели проверяются по SHA-256 после загрузки.</div>
+          <div className="small faint">{t('Модели проверяются по SHA-256 после загрузки.')}</div>
         </div>
       )}
       <ErrorText text={err ?? asr?.error ?? null} />
+    </div>
+  )
+}
+
+/** macOS gates mic and system audio per app; I show what is missing and a shortcut to the right Settings pane. */
+function MacPermissions() {
+  const [acc, setAcc] = useState<MediaAccessReport | null>(null)
+  useEffect(() => {
+    const load = () => void api.media.access().then(setAcc)
+    load()
+    window.addEventListener('focus', load)
+    return () => window.removeEventListener('focus', load)
+  }, [])
+  if (!acc?.gated) return null
+  const missing = (['microphone', 'screen'] as const).filter((k) => acc[k] !== 'granted' && acc[k] !== 'not-determined')
+  if (!missing.length) return null
+  return (
+    <div className="banner warn small col" style={{ gap: 6 }}>
+      <span>
+        {t('macOS не дал доступ:')}{' '}
+        {missing.map((k) => (k === 'microphone' ? t('«Микрофон»') : t('«Запись экрана и системного аудио» (нужна для звука собеседника)'))).join(', ')}.{' '}
+        {t('После включения перезапустите Copilot.')}
+      </span>
+      <div className="row">
+        {missing.map((k) => (
+          <button key={k} className="btn sm" onClick={() => void api.media.openPrivacy(k)}>
+            {t('Открыть настройки: {name}', { name: k === 'microphone' ? t('Микрофон') : t('Запись экрана') })}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -98,15 +158,15 @@ function Probe({ source, deviceId }: { source: Source; deviceId: string | null }
       const max = await probeLevel(source, deviceId, 4000, setLevel)
       setVerdict(
         max > 0.02
-          ? 'Сигнал есть — всё слышно.'
+          ? t('Сигнал есть — всё слышно.')
           : max > 0.004
-            ? 'Очень тихо — проверьте громкость.'
+            ? t('Очень тихо — проверьте громкость.')
             : source === 'user'
-              ? 'Тишина. Проверьте выбранный микрофон и его громкость в Windows.'
-              : 'Тишина. Включите звук в звонке/видео во время проверки.'
+              ? t('Тишина. Проверьте выбранный микрофон и его громкость в {where}.', { where: isMac ? t('Системных настройках → Звук') : 'Windows' })
+              : t('Тишина. Включите звук в звонке/видео во время проверки.')
       )
     } catch (e) {
-      setVerdict(`Ошибка: ${(e as Error).message}`)
+      setVerdict(t('Ошибка: {msg}', { msg: (e as Error).message }))
     } finally {
       setLevel(0)
       setBusy(false)
@@ -116,7 +176,7 @@ function Probe({ source, deviceId }: { source: Source; deviceId: string | null }
     <div className="col" style={{ gap: 6 }}>
       <div className="row">
         <button className="btn sm" onClick={() => void run()} disabled={busy}>
-          {busy ? 'Слушаю 4 с…' : source === 'user' ? 'Слышит ли меня?' : 'Слышит ли собеседника?'}
+          {busy ? t('Слушаю 4 с…') : source === 'user' ? t('Слышит ли меня?') : t('Слышит ли собеседника?')}
         </button>
         <div className="grow">
           <Meter value={level} />
@@ -145,32 +205,44 @@ export function DeviceSettings({ ctx }: { ctx: Ctx }) {
   }, [])
   const a = ctx.settings.audio
   return (
-    <div className="grid2">
-      <div className="col">
-        <Toggle on={a.captureMic} onChange={(v) => void ctx.patch({ audio: { captureMic: v } })} label="Мой микрофон" hint="Ваша речь — источник «user»" />
-        <select className="input" value={a.micDeviceId ?? ''} onChange={(e) => void ctx.patch({ audio: { micDeviceId: e.target.value || null } })}>
-          <option value="">Системный по умолчанию</option>
-          {mics
-            .filter((m) => m.deviceId && m.deviceId !== 'default' && m.deviceId !== 'communications')
-            .map((m) => (
-              <option key={m.deviceId} value={m.deviceId}>
-                {m.label || 'Микрофон'}
-              </option>
-            ))}
-        </select>
-        <Probe source="user" deviceId={a.micDeviceId} />
+    <>
+      {isMac && <MacPermissions />}
+      <div className="grid2">
+        <div className="col">
+          <Toggle
+            on={a.captureMic}
+            onChange={(v) => void ctx.patch({ audio: { captureMic: v } })}
+            label={t('Мой микрофон')}
+            hint={t('Ваша речь — источник «user»')}
+          />
+          <select className="input" value={a.micDeviceId ?? ''} onChange={(e) => void ctx.patch({ audio: { micDeviceId: e.target.value || null } })}>
+            <option value="">{t('Системный по умолчанию')}</option>
+            {mics
+              .filter((m) => m.deviceId && m.deviceId !== 'default' && m.deviceId !== 'communications')
+              .map((m) => (
+                <option key={m.deviceId} value={m.deviceId}>
+                  {m.label || t('Микрофон')}
+                </option>
+              ))}
+          </select>
+          <Probe source="user" deviceId={a.micDeviceId} />
+        </div>
+        <div className="col">
+          <Toggle
+            on={a.captureSystem}
+            onChange={(v) => void ctx.patch({ audio: { captureSystem: v } })}
+            label={t('Звук собеседника (системный звук)')}
+            hint={
+              isMac
+                ? t('Весь системный звук через ScreenCaptureKit — нужен доступ «Запись экрана». Захват отдельного приложения пока не поддерживается.')
+                : t('WASAPI loopback: весь звук, который играет Windows. Захват отдельного приложения пока не поддерживается.')
+            }
+          />
+          <div className="small muted">{t('Совет: наушники убирают эхо собеседника в микрофоне.')}</div>
+          <Probe source="remote" deviceId={null} />
+        </div>
       </div>
-      <div className="col">
-        <Toggle
-          on={a.captureSystem}
-          onChange={(v) => void ctx.patch({ audio: { captureSystem: v } })}
-          label="Звук собеседника (системный звук)"
-          hint="WASAPI loopback: весь звук, который играет Windows. Захват отдельного приложения пока не поддерживается."
-        />
-        <div className="small muted">Совет: наушники убирают эхо собеседника в микрофоне.</div>
-        <Probe source="remote" deviceId={null} />
-      </div>
-    </div>
+    </>
   )
 }
 
@@ -180,22 +252,22 @@ export function AudioTab({ ctx, asr }: { ctx: Ctx; asr: AsrStatus | null }) {
   return (
     <div className="col" style={{ gap: 16 }}>
       <section className="card col">
-        <h2>Устройства</h2>
+        <h2>{t('Устройства')}</h2>
         <DeviceSettings ctx={ctx} />
-        <div className="small muted">Сырое аудио на диск не пишется. Пауза и «Завершить» останавливают захват полностью.</div>
+        <div className="small muted">{t('Сырое аудио на диск не пишется. Пауза и «Завершить» останавливают захват полностью.')}</div>
       </section>
       <section className="card col">
-        <h2>Распознавание речи (локально, whisper.cpp)</h2>
+        <h2>{t('Распознавание речи (локально, whisper.cpp)')}</h2>
         <AsrInstaller ctx={ctx} asr={asr} />
         <div className="grid2">
           <label className="field">
-            <span>Язык речи</span>
+            <span>{t('Язык речи')}</span>
             <select className="input" value={s.language} onChange={(e) => void ctx.patch({ asr: { language: e.target.value as 'auto' | Lang } })}>
               {ASR_LANG_OPTIONS}
             </select>
           </label>
           <label className="field">
-            <span>Потоков процессора</span>
+            <span>{t('Потоков процессора')}</span>
             <input
               className="input"
               type="number"
@@ -207,7 +279,7 @@ export function AudioTab({ ctx, asr }: { ctx: Ctx; asr: AsrStatus | null }) {
           </label>
         </div>
         <label className="field">
-          <span>Словарь терминов — помогает правильно писать названия (через запятую)</span>
+          <span>{t('Словарь терминов — помогает правильно писать названия (через запятую)')}</span>
           <input
             className="input"
             value={vocab}
@@ -224,7 +296,7 @@ export function AudioTab({ ctx, asr }: { ctx: Ctx; asr: AsrStatus | null }) {
             }
           />
         </label>
-        {asr?.lastLatencyMs != null && <div className="small muted">Последняя задержка распознавания: {asr.lastLatencyMs} мс</div>}
+        {asr?.lastLatencyMs != null && <div className="small muted">{t('Последняя задержка распознавания: {ms} мс', { ms: asr.lastLatencyMs })}</div>}
       </section>
     </div>
   )

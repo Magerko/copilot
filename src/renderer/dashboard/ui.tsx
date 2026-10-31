@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { ComponentStatus } from '@shared/types'
+import { t } from '../lib/i18n'
 
 export function Toggle({ on, onChange, label, hint }: { on: boolean; onChange: (v: boolean) => void; label: ReactNode; hint?: ReactNode }) {
   return (
@@ -40,7 +41,7 @@ export function Section({ title, children, aside }: { title: string; children: R
 export function Meter({ value }: { value: number }) {
   const pct = Math.min(100, Math.round(Math.sqrt(Math.max(0, value)) * 220))
   return (
-    <div className="meter" aria-label="уровень">
+    <div className="meter" aria-label={t('уровень')}>
       <i style={{ width: `${pct}%`, background: pct > 85 ? 'var(--warn)' : 'var(--ok)' }} />
     </div>
   )

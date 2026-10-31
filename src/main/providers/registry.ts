@@ -8,6 +8,7 @@ import { toAppError } from './errors'
 import { runStream } from './runner'
 import type { ResolvedTarget } from '../session/manager'
 import { solidPng } from '../util/png'
+import { t } from '@shared/i18n'
 
 // Ollama serves '…:cloud' / '…-cloud' models from loopback but runs them on ollama.com, so the URL alone does not make them local.
 export function isLocalTarget(baseUrl: string, model: string): boolean {
@@ -111,7 +112,7 @@ export class ProviderRegistry {
   async test(id: string, model: string | null): Promise<ProviderTestReport> {
     const a = this.adapter(id)
     const cfg = this.get(id)
-    if (!a || !cfg) return { models: { ok: false, error: { code: 'not_found', message: 'Провайдер не найден' } }, text: null, vision: null }
+    if (!a || !cfg) return { models: { ok: false, error: { code: 'not_found', message: t('Провайдер не найден') } }, text: null, vision: null }
     const t0 = Date.now()
     let models: TestResult
     let list: ModelInfo[]
@@ -141,7 +142,7 @@ export class ProviderRegistry {
     let vision: ProviderTestReport['vision']
     if (list.find((m) => m.id === model)?.vision === false) {
       this.visionOk.set(`${id}/${model}`, false)
-      return { models, text, vision: { ok: false, error: 'Модель без поддержки изображений — для экрана будет OCR' } }
+      return { models, text, vision: { ok: false, error: t('Модель без поддержки изображений — для экрана будет OCR') } }
     }
     try {
       const r = await runStream(
@@ -157,7 +158,7 @@ export class ProviderRegistry {
         { timeoutMs: Math.max(cfg.timeoutMs, 20_000), retries: 0 }
       )
       const ok = /red|красн|червон/i.test(r.text)
-      vision = ok ? { ok } : { ok, error: `Модель не распознала тестовое изображение («${r.text.slice(0, 40)}»)` }
+      vision = ok ? { ok } : { ok, error: t('Модель не распознала тестовое изображение («{reply}»)', { reply: r.text.slice(0, 40) }) }
     } catch (e) {
       vision = { ok: false, error: toAppError(e).message }
     }
