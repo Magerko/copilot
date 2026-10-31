@@ -13,7 +13,8 @@ import type {
   ResumableSession,
   ScreenTask,
   SessionSummary,
-  Settings
+  Settings,
+  UiLang
 } from '@shared/types'
 
 interface Bridge {
@@ -36,6 +37,7 @@ export interface PickerInit {
   scale: number
   hasVision: boolean
   ocr: boolean
+  uiLang: UiLang
 }
 
 export interface PresetInfo {
@@ -108,7 +110,8 @@ export const api = {
   copy: (text: string) => call<void>('km:copy', text),
   screen: {
     begin: () => call<void>('km:screen:begin'),
-    submit: (png: string, task: ScreenTask, withCode: boolean, codeLang: string) => call<void>('km:screen:submit', png, task, withCode, codeLang),
+    submit: (png: string, task: ScreenTask, withCode: boolean, codeLang: string, instruction = '') =>
+      call<void>('km:screen:submit', png, task, withCode, codeLang, instruction),
     cancel: () => call<void>('km:screen:cancel')
   },
   profiles: {

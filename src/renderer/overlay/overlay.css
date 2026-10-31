@@ -130,6 +130,52 @@ body {
   font-size: 12px;
 }
 
+/* mic / system-audio toggles: red dot while capturing, crossed out when turned off */
+.ov-src {
+  position: relative;
+  width: 32px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ov-src.live {
+  color: var(--err);
+}
+.ov-src-dot {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--err);
+  box-shadow: 0 0 6px var(--err);
+  animation: pulse 1.6s infinite;
+}
+.ov-src.trouble {
+  color: var(--warn);
+}
+.ov-src.off {
+  color: var(--muted);
+}
+.ov-src.off::after {
+  content: '';
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  top: 50%;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  transform: rotate(-40deg);
+}
+
 /* ── transcript chips ────────────────────────────────────── */
 .ov-chips {
   display: flex;

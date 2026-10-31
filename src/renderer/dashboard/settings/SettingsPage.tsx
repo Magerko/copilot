@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { AppSnapshot, AsrStatus, DiagReport, ShortcutAction } from '@shared/types'
 import { api, isMac } from '../../lib/api'
 import { useAsync } from '../../lib/hooks'
+import { t } from '../../lib/i18n'
 import { pretty, toAccelerator } from '../../lib/keys'
 import type { Ctx } from '../App'
 import { ErrorText, fmtDate, Section, Toggle } from '../ui'
@@ -22,11 +23,11 @@ export function SettingsPage({ ctx, snap, asr, tab }: { ctx: Ctx; snap: AppSnaps
   const [cur, setCur] = useState<string>(tab ?? 'providers')
   return (
     <div className="page col" style={{ gap: 16 }}>
-      <h1>Настройки</h1>
+      <h1>{t('Настройки')}</h1>
       <nav className="tabs">
         {TABS.map(([id, label]) => (
           <button key={id} className={cur === id ? 'on' : ''} onClick={() => setCur(id)}>
-            {label}
+            {t(label)}
           </button>
         ))}
       </nav>
@@ -46,16 +47,16 @@ function OverlayTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
   return (
     <div className="col" style={{ gap: 16 }}>
       <Section
-        title="Окно подсказок"
+        title={t('Окно подсказок')}
         aside={
           <button className="btn sm" onClick={() => void api.overlay.toggle()}>
-            Показать / скрыть
+            {t('Показать / скрыть')}
           </button>
         }
       >
         <div className="grid2">
           <label className="field">
-            <span>Непрозрачность фона: {Math.round(o.opacity * 100)}%</span>
+            <span>{t('Непрозрачность фона: {n}%', { n: Math.round(o.opacity * 100) })}</span>
             <input
               type="range"
               min={0.15}
@@ -64,10 +65,10 @@ function OverlayTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
               value={o.opacity}
               onChange={(e) => void ctx.patch({ overlay: { opacity: Number(e.target.value) } })}
             />
-            <span className="small faint">Фон окна подсказок просвечивает, текст остаётся чётким. 100% — непрозрачный.</span>
+            <span className="small faint">{t('Фон окна подсказок просвечивает, текст остаётся чётким. 100% — непрозрачный.')}</span>
           </label>
           <label className="field">
-            <span>Размер шрифта: {Math.round(o.fontScale * 100)}%</span>
+            <span>{t('Размер шрифта: {n}%', { n: Math.round(o.fontScale * 100) })}</span>
             <input
               type="range"
               min={0.8}
@@ -78,7 +79,7 @@ function OverlayTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
             />
           </label>
           <label className="field">
-            <span>Ширина окна: {o.size.width} px</span>
+            <span>{t('Ширина окна: {n} px', { n: o.size.width })}</span>
             <input
               type="range"
               min={360}
@@ -89,7 +90,7 @@ function OverlayTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
             />
           </label>
           <label className="field">
-            <span>Высота окна: {o.size.height} px</span>
+            <span>{t('Высота окна: {n} px', { n: o.size.height })}</span>
             <input
               type="range"
               min={160}
@@ -99,18 +100,18 @@ function OverlayTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
               onChange={(e) => void ctx.patch({ overlay: { size: { width: o.size.width, height: Number(e.target.value) } } })}
             />
             <span className="small faint">
-              В компактном режиме окно растёт под ответ до этой высоты, в развёрнутом — занимает её целиком. Можно и просто потянуть за край окна.
+              {t('В компактном режиме окно растёт под ответ до этой высоты, в развёрнутом — занимает её целиком. Можно и просто потянуть за край окна.')}
             </span>
           </label>
           <label className="field">
-            <span>Тема</span>
+            <span>{t('Тема')}</span>
             <select className="input" value={o.theme} onChange={(e) => void ctx.patch({ overlay: { theme: e.target.value as 'dark' | 'light' } })}>
-              <option value="dark">Тёмная</option>
-              <option value="light">Светлая</option>
+              <option value="dark">{t('Тёмная')}</option>
+              <option value="light">{t('Светлая')}</option>
             </select>
           </label>
           <label className="field">
-            <span>Язык интерфейса</span>
+            <span>{t('Язык интерфейса')}</span>
             <select className="input" value={ctx.settings.uiLang} onChange={(e) => void ctx.patch({ uiLang: e.target.value as 'ru' })}>
               <option value="ru">Русский</option>
               <option value="uk">Українська</option>
@@ -118,71 +119,79 @@ function OverlayTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
             </select>
           </label>
         </div>
-        <Toggle on={o.pinned} onChange={(v) => void ctx.patch({ overlay: { pinned: v } })} label="Поверх всех окон" />
+        <Toggle on={o.pinned} onChange={(v) => void ctx.patch({ overlay: { pinned: v } })} label={t('Поверх всех окон')} />
         <Toggle
           on={ctx.settings.autoAnswer}
           onChange={(v) => void ctx.patch({ autoAnswer: v })}
-          label="Отвечать автоматически на распознанный вопрос"
-          hint="Выключено — ответ по кнопке/горячей клавише: дешевле и предсказуемее. Сомнительные реплики всегда показываются как «Возможный вопрос» без генерации."
+          label={t('Отвечать автоматически на распознанный вопрос')}
+          hint={t(
+            'Выключено — ответ по кнопке/горячей клавише: дешевле и предсказуемее. Сомнительные реплики всегда показываются как «Возможный вопрос» без генерации.'
+          )}
         />
+        <AnswerInstructions ctx={ctx} />
         <div className="small muted">
-          Окно перетаскивается за верхнюю полосу и меняет размер за края. Положение и монитор запоминаются. Окно никогда не забирает фокус клавиатуры.
+          {t('Окно перетаскивается за верхнюю полосу и меняет размер за края. Положение и монитор запоминаются. Окно никогда не забирает фокус клавиатуры.')}
         </div>
       </Section>
 
-      <Section title="Защита от демонстрации экрана">
+      <Section title={t('Защита от демонстрации экрана')}>
         <Toggle
           on={o.protect}
           onChange={(v) => void ctx.patch({ overlay: { protect: v } })}
-          label="Скрывать окно подсказок из захвата экрана"
-          hint={`Статус: ${snap.status.protection.label}`}
+          label={t('Скрывать окно подсказок из захвата экрана')}
+          hint={t('Статус: {s}', { s: snap.status.protection.label })}
         />
         <div className="banner small">
-          {isMac ? 'Это системный флаг macOS (NSWindowSharingNone).' : 'Это системный флаг Windows (SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE).'} Он{' '}
-          <b>не гарантирует</b> невидимость: разные программы захватывают экран по-разному, и мы не обходим средства контроля. Режим тренировки работает
-          полноценно без него.
+          {isMac ? t('Это системный флаг macOS (NSWindowSharingNone).') : t('Это системный флаг Windows (SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE).')}{' '}
+          <b>{t('Он не гарантирует невидимость:')}</b>{' '}
+          {t('разные программы захватывают экран по-разному, и мы не обходим средства контроля. Режим тренировки работает полноценно без него.')}
         </div>
         <div className="col small">
-          <b>Как проверить у себя (2 минуты):</b>
+          <b>{t('Как проверить у себя (2 минуты):')}</b>
           <ol style={{ margin: 0, paddingLeft: 18 }}>
-            <li>Откройте подсказки (оверлей) поверх окна.</li>
-            <li>Начните демонстрацию экрана в Zoom/Meet/Teams или OBS.</li>
-            <li>Посмотрите на результат со второго устройства/второго аккаунта или в окне предпросмотра OBS.</li>
-            <li>Оверлей не виден — защита работает для этого способа захвата. Виден — не полагайтесь на неё.</li>
+            <li>{t('Откройте подсказки (оверлей) поверх окна.')}</li>
+            <li>{t('Начните демонстрацию экрана в Zoom/Meet/Teams или OBS.')}</li>
+            <li>{t('Посмотрите на результат со второго устройства/второго аккаунта или в окне предпросмотра OBS.')}</li>
+            <li>{t('Оверлей не виден — защита работает для этого способа захвата. Виден — не полагайтесь на неё.')}</li>
           </ol>
           <div className="faint">
-            Проверено автоматически: захват экрана Chromium (Electron desktopCapturer) — окно исключается. Не проверено: Zoom, Teams, Meet, OBS Game/Window
-            Capture, RDP — проверьте сами по шагам выше.
+            {t(
+              'Проверено автоматически: захват экрана Chromium (Electron desktopCapturer) — окно исключается. Не проверено: Zoom, Teams, Meet, OBS Game/Window Capture, RDP — проверьте сами по шагам выше.'
+            )}
           </div>
         </div>
         <Toggle
           on={ctx.settings.window.protectFromCapture}
           onChange={(v) => void ctx.patch({ window: { protectFromCapture: v } })}
-          label="Скрывать из захвата и главное окно, и выбор области"
-          hint="Тот же системный флаг. Если на звонке попросят показать экран, окна Copilot не попадут в поток — но вы их видите. Не гарантия: зависит от программы захвата."
+          label={t('Скрывать из захвата и главное окно, и выбор области')}
+          hint={t(
+            'Тот же системный флаг. Если на звонке попросят показать экран, окна Copilot не попадут в поток — но вы их видите. Не гарантия: зависит от программы захвата.'
+          )}
         />
       </Section>
 
-      <Section title="Окно и трей">
+      <Section title={t('Окно и трей')}>
         <Toggle
           on={ctx.settings.window.minimizeToTray}
           onChange={(v) => void ctx.patch({ window: { minimizeToTray: v } })}
-          label="Сворачивать в трей при закрытии и сворачивании"
-          hint="Окно прячется в значок рядом с часами, приложение и сессия продолжают работать. Полный выход — через меню значка в трее."
+          label={t('Сворачивать в трей при закрытии и сворачивании')}
+          hint={t('Окно прячется в значок рядом с часами, приложение и сессия продолжают работать. Полный выход — через меню значка в трее.')}
         />
         {isMac && (
           <Toggle
             on={ctx.settings.window.hideFromDock}
             onChange={(v) => void ctx.patch({ window: { hideFromDock: v } })}
-            label="Скрывать из Dock и ⌘Tab"
-            hint="Copilot не виден среди запущенных программ — только значок в строке меню справа вверху. Через него открывается окно и делается выход."
+            label={t('Скрывать из Dock и ⌘Tab')}
+            hint={t('Copilot не виден среди запущенных программ — только значок в строке меню справа вверху. Через него открывается окно и делается выход.')}
           />
         )}
         <Toggle
           on={ctx.settings.window.panicQuits}
           onChange={(v) => void ctx.patch({ window: { panicQuits: v } })}
-          label="Аварийная остановка полностью закрывает приложение"
-          hint="По умолчанию аварийная остановка только глушит захват и прячет подсказки, а приложение остаётся в трее. С этой опцией — приложение полностью завершается (процесса не остаётся)."
+          label={t('Аварийная остановка полностью закрывает приложение')}
+          hint={t(
+            'По умолчанию аварийная остановка только глушит захват и прячет подсказки, а приложение остаётся в трее. С этой опцией — приложение полностью завершается (процесса не остаётся).'
+          )}
         />
       </Section>
     </div>
@@ -205,23 +214,24 @@ function ShortcutsTab({ ctx }: { ctx: Ctx }) {
   const [diag] = useAsync(() => api.diagnostics(), [ctx.settings.shortcuts])
   const conflicts = diag?.checks.find((c) => c.id === 'shortcuts')
   return (
-    <Section title="Глобальные горячие клавиши">
+    <Section title={t('Глобальные горячие клавиши')}>
       <div className="small muted">
-        Работают из любой программы (IDE, Zoom, OBS) и не перехватывают остальной ввод. Нажмите «Изменить», затем сочетание с{' '}
-        {isMac ? '⌘/⌥/⌃/⇧' : 'Ctrl/Alt/Shift'}.
+        {t('Работают из любой программы (IDE, Zoom, OBS) и не перехватывают остальной ввод. Нажмите «Изменить», затем сочетание с {mods}.', {
+          mods: isMac ? '⌘/⌥/⌃/⇧' : 'Ctrl/Alt/Shift'
+        })}
       </div>
       {conflicts && <div className={`banner small ${conflicts.ok ? 'ok' : 'warn'}`}>{conflicts.detail}</div>}
       <div className="col" style={{ gap: 6 }}>
         {(Object.keys(SHORTCUT_LABEL) as ShortcutAction[]).map((a) => (
           <div key={a} className="row">
-            <span className="grow">{SHORTCUT_LABEL[a]}</span>
+            <span className="grow">{t(SHORTCUT_LABEL[a])}</span>
             {rec === a ? (
               <input
                 className="input"
                 style={{ width: 220 }}
                 autoFocus
                 readOnly
-                placeholder="Нажмите сочетание…"
+                placeholder={t('Нажмите сочетание…')}
                 onBlur={() => setRec(null)}
                 onKeyDown={(e) => {
                   e.preventDefault()
@@ -237,7 +247,7 @@ function ShortcutsTab({ ctx }: { ctx: Ctx }) {
               <kbd style={{ minWidth: 160, textAlign: 'center' }}>{pretty(ctx.settings.shortcuts[a])}</kbd>
             )}
             <button className="btn sm" onClick={() => setRec(a)}>
-              Изменить
+              {t('Изменить')}
             </button>
           </div>
         ))}
@@ -252,56 +262,59 @@ function PrivacyTab({ ctx }: { ctx: Ctx }) {
   const [msg, setMsg] = useState<string | null>(null)
   return (
     <div className="col" style={{ gap: 16 }}>
-      <Section title="Разрешения">
-        <Toggle on={c.mic} onChange={(v) => set('mic', v)} label="Захват микрофона" />
-        <Toggle on={c.system} onChange={(v) => set('system', v)} label="Захват системного звука (голос собеседника)" />
+      <Section title={t('Разрешения')}>
+        <Toggle on={c.mic} onChange={(v) => set('mic', v)} label={t('Захват микрофона')} />
+        <Toggle on={c.system} onChange={(v) => set('system', v)} label={t('Захват системного звука (голос собеседника)')} />
         <Toggle
           on={c.screen}
           onChange={(v) => set('screen', v)}
-          label="Снимки экрана по моей команде"
-          hint="Никогда не делаются автоматически и не отправляются без подтверждения."
+          label={t('Снимки экрана по моей команде')}
+          hint={t('Никогда не делаются автоматически и не отправляются без подтверждения.')}
         />
         <Toggle
           on={c.cloud}
           onChange={(v) => set('cloud', v)}
-          label="Отправка текста облачным провайдерам"
-          hint="Нужно для OpenAI / Anthropic / Gemini / AnyModel. Для Ollama не требуется."
+          label={t('Отправка текста облачным провайдерам')}
+          hint={t('Нужно для OpenAI / Anthropic / Gemini / AnyModel. Для Ollama не требуется.')}
         />
-        <Toggle on={c.history} onChange={(v) => set('history', v)} label="Сохранять историю сессий на этом компьютере" />
-        <div className="small muted">Телеметрии нет: приложение ничего не отправляет своим разработчикам.</div>
+        <Toggle on={c.history} onChange={(v) => set('history', v)} label={t('Сохранять историю сессий на этом компьютере')} />
+        <div className="small muted">{t('Телеметрии нет: приложение ничего не отправляет своим разработчикам.')}</div>
       </Section>
-      <Section title="Офлайн-режим">
+      <Section title={t('Офлайн-режим')}>
         <Toggle
           on={ctx.settings.offline}
           onChange={(v) => void ctx.patch({ offline: v })}
-          label="Работать без интернета"
-          hint="Блокирует все внешние адреса на уровне приложения. Работают только локальные модели (Ollama, LM Studio) и локальное распознавание."
+          label={t('Работать без интернета')}
+          hint={t('Блокирует все внешние адреса на уровне приложения. Работают только локальные модели (Ollama, LM Studio) и локальное распознавание.')}
         />
       </Section>
-      <Section title="Данные">
+      <Section title={t('Данные')}>
         <div className="small">
-          История, транскрипты и индексы документов лежат в SQLite в{' '}
-          <span className="mono">{isMac ? '~/Library/Application Support/copilot' : '%APPDATA%\\copilot'}</span>. Ключи — в отдельном файле, зашифрованном
-          системным хранилищем ({isMac ? 'Связка ключей macOS' : 'Windows DPAPI'}). Сырое аудио не сохраняется.
+          {t('История, транскрипты и индексы документов лежат в SQLite в')}{' '}
+          <span className="mono">{isMac ? '~/Library/Application Support/copilot' : '%APPDATA%\\copilot'}</span>.{' '}
+          {t('Ключи — в отдельном файле, зашифрованном системным хранилищем ({store}). Сырое аудио не сохраняется.', {
+            store: isMac ? t('Связка ключей macOS') : 'Windows DPAPI'
+          })}
         </div>
         <div className="small muted">
-          Важно: то, что приложение не шлёт данные своим серверам, не значит, что данные не уходят провайдеру модели. Облачный провайдер получает текст вопроса
-          и выбранный контекст по своей политике данных.
+          {t(
+            'Важно: то, что приложение не шлёт данные своим серверам, не значит, что данные не уходят провайдеру модели. Облачный провайдер получает текст вопроса и выбранный контекст по своей политике данных.'
+          )}
         </div>
         <div className="row">
           <button
             className="btn danger"
             onClick={async () => {
               await api.history.removeAll()
-              setMsg('История и журнал диагностики удалены.')
+              setMsg(t('История и журнал диагностики удалены.'))
             }}
           >
-            Удалить всю историю
+            {t('Удалить всю историю')}
           </button>
           {msg && <span className="small">{msg}</span>}
         </div>
         <div className="small muted">
-          Ответственность за допустимость записи и AI-подсказок в конкретном интервью/встрече — на пользователе. Сообщайте участникам о записи.
+          {t('Ответственность за допустимость записи и AI-подсказок в конкретном интервью/встрече — на пользователе. Сообщайте участникам о записи.')}
         </div>
       </Section>
     </div>
@@ -315,10 +328,10 @@ function UsageTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
   const num = (v: string) => (v.trim() === '' ? null : Number(v))
   return (
     <div className="col" style={{ gap: 16 }}>
-      <Section title="Лимиты">
+      <Section title={t('Лимиты')}>
         <div className="grid2">
           <label className="field">
-            <span>Максимум $ за сессию (пусто — без лимита)</span>
+            <span>{t('Максимум $ за сессию (пусто — без лимита)')}</span>
             <input
               className="input"
               type="number"
@@ -329,7 +342,7 @@ function UsageTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
             />
           </label>
           <label className="field">
-            <span>Максимум $ в день</span>
+            <span>{t('Максимум $ в день')}</span>
             <input
               className="input"
               type="number"
@@ -340,7 +353,7 @@ function UsageTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
             />
           </label>
           <label className="field">
-            <span>Запросов в минуту</span>
+            <span>{t('Запросов в минуту')}</span>
             <input
               className="input"
               type="number"
@@ -350,7 +363,7 @@ function UsageTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
             />
           </label>
           <label className="field">
-            <span>Одновременных запросов</span>
+            <span>{t('Одновременных запросов')}</span>
             <input
               className="input"
               type="number"
@@ -362,13 +375,14 @@ function UsageTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
           </label>
         </div>
         <div className="small muted">
-          При достижении лимита платные запросы останавливаются до вашего подтверждения. Провайдер сам не переключается. Локальные модели лимитом $ не
-          ограничиваются.
+          {t(
+            'При достижении лимита платные запросы останавливаются до вашего подтверждения. Провайдер сам не переключается. Локальные модели лимитом $ не ограничиваются.'
+          )}
         </div>
       </Section>
-      <Section title="Цены моделей">
+      <Section title={t('Цены моделей')}>
         <div className="small muted">
-          Цены меняются — впишите актуальные с сайта провайдера ($ за 1 млн токенов). Без цены расход показывается как «Цена неизвестна», а не $0.
+          {t('Цены меняются — впишите актуальные с сайта провайдера ($ за 1 млн токенов). Без цены расход показывается как «Цена неизвестна», а не $0.')}
         </div>
         {uniq.map((r) => {
           const key = `${r.providerId}/${r.model}`
@@ -382,7 +396,7 @@ function UsageTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
                 type="number"
                 min={0}
                 step={0.01}
-                placeholder="вход"
+                placeholder={t('вход')}
                 value={p?.inputPerMTok ?? ''}
                 onChange={(e) => void ctx.patch({ pricing: { [key]: { inputPerMTok: Number(e.target.value), outputPerMTok: p?.outputPerMTok ?? 0 } } })}
               />
@@ -392,19 +406,19 @@ function UsageTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
                 type="number"
                 min={0}
                 step={0.01}
-                placeholder="выход"
+                placeholder={t('выход')}
                 value={p?.outputPerMTok ?? ''}
                 onChange={(e) => void ctx.patch({ pricing: { [key]: { inputPerMTok: p?.inputPerMTok ?? 0, outputPerMTok: Number(e.target.value) } } })}
               />
             </div>
           )
         })}
-        {!uniq.length && <div className="muted small">Сначала выберите модели на вкладке «Провайдеры».</div>}
+        {!uniq.length && <div className="muted small">{t('Сначала выберите модели на вкладке «Провайдеры».')}</div>}
       </Section>
-      <Section title="Текущая сессия">
+      <Section title={t('Текущая сессия')}>
         <div className="small">
-          Запросов: {snap.cost.requests} · расход: {snap.cost.usd == null ? '—' : `$${snap.cost.usd.toFixed(4)}`}
-          {snap.cost.unknownPriced > 0 && ` · без цены: ${snap.cost.unknownPriced}`}
+          {t('Запросов: {n} · расход: {usd}', { n: snap.cost.requests, usd: snap.cost.usd == null ? '—' : `$${snap.cost.usd.toFixed(4)}` })}
+          {snap.cost.unknownPriced > 0 && ' · ' + t('без цены: {n}', { n: snap.cost.unknownPriced })}
         </div>
       </Section>
     </div>
@@ -431,10 +445,10 @@ function DiagnosticsTab() {
   return (
     <div className="col" style={{ gap: 16 }}>
       <Section
-        title="Проверка системы"
+        title={t('Проверка системы')}
         aside={
           <button className="btn primary" onClick={() => void run()} disabled={busy}>
-            {busy ? 'Проверяю…' : 'Запустить проверку'}
+            {busy ? t('Проверяю…') : t('Запустить проверку')}
           </button>
         }
       >
@@ -458,23 +472,50 @@ function DiagnosticsTab() {
                   }
                 }}
               >
-                Установить OCR (≈10 МБ)
+                {t('Установить OCR (≈10 МБ)')}
               </button>
             )}
           </div>
         ))}
-        {!rep && <div className="muted small">Проверит ключи, распознавание, соединение с моделями, горячие клавиши, защиту окна, офлайн-режим и базу.</div>}
+        {!rep && (
+          <div className="muted small">{t('Проверит ключи, распознавание, соединение с моделями, горячие клавиши, защиту окна, офлайн-режим и базу.')}</div>
+        )}
       </Section>
-      <Section title="Журнал (без ключей и текстов разговоров)">
+      <Section title={t('Журнал (без ключей и текстов разговоров)')}>
         <div className="col mono small scroll" style={{ maxHeight: 280, gap: 2 }}>
           {log?.map((l, i) => (
             <div key={i}>
               <span className="faint">{fmtDate(l.at)}</span> {l.kind} {l.data.slice(0, 200)}
             </div>
           ))}
-          {log && !log.length && <div className="muted">Пусто</div>}
+          {log && !log.length && <div className="muted">{t('Пусто')}</div>}
         </div>
       </Section>
     </div>
+  )
+}
+
+/** Free-form instructions for the answer prompt; saved on blur so typing does not write settings on every key. */
+function AnswerInstructions({ ctx }: { ctx: Ctx }) {
+  const [text, setText] = useState(ctx.settings.answerInstructions)
+  const saved = text === ctx.settings.answerInstructions
+  return (
+    <label className="field">
+      <span>{t('Как отвечать (ваши инструкции для ИИ)')}</span>
+      <textarea
+        className="input"
+        rows={4}
+        maxLength={2000}
+        value={text}
+        placeholder={t('Например: отвечай коротко, от первого лица, как опытный QA; приводи примеры из fintech; без канцелярита.')}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => !saved && void ctx.patch({ answerInstructions: text })}
+      />
+      <span className="small faint">
+        {saved
+          ? t('Добавляется к каждому ответу. Правила безопасности (не выдумывать факты, не раскрывать ключи) важнее.')
+          : t('Сохранится, когда уйдёте из поля.')}
+      </span>
+    </label>
   )
 }

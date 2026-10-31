@@ -3,6 +3,7 @@ import { createServer } from 'node:net'
 import { dirname } from 'node:path'
 import type { Lang } from '@shared/types'
 import type { FetchFn } from '../providers/adapter'
+import { t } from '@shared/i18n'
 
 export interface WhisperResult {
   text: string
@@ -125,17 +126,17 @@ export function diagnoseWhisperFailure(exitCode: number | null, lines: string[])
   const text = lines.join('\n').toLowerCase()
   const u = (exitCode ?? 0) >>> 0
   if (/msvcp140|vcruntime140|vcomp140|the code execution cannot proceed|не удалось запустить/.test(text) || u === 0xc0000135)
-    return 'не хватает Microsoft Visual C++ Redistributable (x64) — установите его с сайта Microsoft и перезапустите'
+    return t('не хватает Microsoft Visual C++ Redistributable (x64) — установите его с сайта Microsoft и перезапустите')
   if (/illegal instruction|invalid opcode|unsupported instruction/.test(text) || u === 0xc000001d)
-    return 'процессор, похоже, без нужных инструкций (AVX) — на старом CPU whisper.cpp может не запускаться'
+    return t('процессор, похоже, без нужных инструкций (AVX) — на старом CPU whisper.cpp может не запускаться')
   if (/cuda|cublas|nvcuda|cudart|no cuda-capable|cublaslt/.test(text))
-    return 'ошибка CUDA/видеокарты — обновите драйвер NVIDIA или выберите CPU-движок в «Настройки → Распознавание»'
+    return t('ошибка CUDA/видеокарты — обновите драйвер NVIDIA или выберите CPU-движок в «Настройки → Распознавание»')
   if (/failed to load model|invalid model|unknown (model )?architecture|bad magic|wrong magic|ggml_|corrupt/.test(text))
-    return 'файл модели повреждён или несовместим — удалите и скачайте модель заново'
-  if (/address already in use|eaddrinuse|bind.*fail/.test(text)) return 'порт занят другим процессом — закройте лишние копии и попробуйте снова'
-  if (u === 0xc0000005) return 'аварийное завершение (access violation) — возможно, повреждён движок или модель; переустановите распознавание'
+    return t('файл модели повреждён или несовместим — удалите и скачайте модель заново')
+  if (/address already in use|eaddrinuse|bind.*fail/.test(text)) return t('порт занят другим процессом — закройте лишние копии и попробуйте снова')
+  if (u === 0xc0000005) return t('аварийное завершение (access violation) — возможно, повреждён движок или модель; переустановите распознавание')
   if (/access is denied|отказано в доступе|0x80070005/.test(text) || u === 0xc0000022)
-    return 'запуск заблокирован (антивирус или права доступа) — добавьте папку приложения в исключения'
+    return t('запуск заблокирован (антивирус или права доступа) — добавьте папку приложения в исключения')
   return null
 }
 
@@ -185,7 +186,7 @@ export class WhisperSidecar {
     })
     const deadline = Date.now() + 60_000
     while (Date.now() < deadline) {
-      if (!this.running) throw new Error(this.startupError('whisper-server завершился при запуске'))
+      if (!this.running) throw new Error(this.startupError(t('whisper-server завершился при запуске')))
       try {
         const r = await this.fetch(`http://127.0.0.1:${this.port}/`, { signal: AbortSignal.timeout(1000) })
         if (r.status < 500) return
@@ -194,13 +195,13 @@ export class WhisperSidecar {
       }
       await new Promise((r) => setTimeout(r, 200))
     }
-    throw new Error(this.startupError('whisper-server не ответил за 60 с'))
+    throw new Error(this.startupError(t('whisper-server не ответил за 60 с')))
   }
 
   private startupError(base: string): string {
     const hint = diagnoseWhisperFailure(this.exitCode, this.tail)
-    const code = this.exitCode != null ? ` (код ${this.exitCode})` : ''
-    const out = this.tail.length ? ` — вывод: ${this.tail.slice(-4).join(' | ')}` : ''
+    const code = this.exitCode != null ? ` (${t('код {code}', { code: this.exitCode })})` : ''
+    const out = this.tail.length ? ` — ${t('вывод: {lines}', { lines: this.tail.slice(-4).join(' | ') })}` : ''
     return `${base}${code}${hint ? `. ${hint}` : ''}${out}`
   }
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ModelInfo, ModelRole, ProviderConfig, ProviderPreset } from '@shared/types'
 import { api, isMac, type PresetInfo, type ProviderTestReport } from '../../lib/api'
 import { useAsync } from '../../lib/hooks'
+import { t } from '../../lib/i18n'
 import type { Ctx } from '../App'
 import { ErrorText, Toggle } from '../ui'
 
@@ -62,26 +63,26 @@ export function ProviderForm({
         {(Object.keys(presets) as ProviderPreset[]).map((p) => (
           <button key={p} className={`preset ${preset === p ? 'on' : ''}`} onClick={() => pick(p)} disabled={!!initial}>
             <b>{presets[p].label}</b>
-            <span className="small muted">{presets[p].needsKey ? 'нужен ключ' : 'без ключа'}</span>
+            <span className="small muted">{presets[p].needsKey ? t('нужен ключ') : t('без ключа')}</span>
           </button>
         ))}
       </div>
-      <div className="small muted">{info.note}</div>
+      <div className="small muted">{t(info.note)}</div>
       <div className="grid2">
         <label className="field">
-          <span>Название</span>
+          <span>{t('Название')}</span>
           <input className="input" value={label} onChange={(e) => setLabel(e.target.value)} />
         </label>
         <label className="field">
-          <span>Адрес API</span>
+          <span>{t('Адрес API')}</span>
           <input className="input mono" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
         </label>
         <label className="field">
           <span>
-            API-ключ {initial?.hasKey ? '(сохранён — введите новый, чтобы заменить)' : info.needsKey ? '' : '(не обязателен)'}{' '}
+            {t('API-ключ')} {initial?.hasKey ? t('(сохранён — введите новый, чтобы заменить)') : info.needsKey ? '' : t('(не обязателен)')}{' '}
             {info.keyUrl && (
               <a href="#" onClick={() => void api.open(info.keyUrl!)}>
-                где взять
+                {t('где взять')}
               </a>
             )}
           </span>
@@ -95,26 +96,28 @@ export function ProviderForm({
           />
         </label>
         <label className="field">
-          <span>Ждать первый токен, мс</span>
+          <span>{t('Ждать первый токен, мс')}</span>
           <input className="input" type="number" min={2000} step={1000} value={timeoutMs} onChange={(e) => setTimeoutMs(Number(e.target.value))} />
         </label>
       </div>
       <Toggle
         on={allowFallback}
         onChange={setAllowFallback}
-        label="Разрешить как запасной"
-        hint="Если основной провайдер недоступен (429/5xx/таймаут), запрос можно отправить сюда. Без этой галочки данные сюда не попадут."
+        label={t('Разрешить как запасной')}
+        hint={t('Если основной провайдер недоступен (429/5xx/таймаут), запрос можно отправить сюда. Без этой галочки данные сюда не попадут.')}
       />
-      <div className="small muted">Ключ шифруется системным хранилищем ({isMac ? 'Связка ключей' : 'DPAPI'}) и не попадает в настройки, логи и экспорт.</div>
+      <div className="small muted">
+        {t('Ключ шифруется системным хранилищем ({store}) и не попадает в настройки, логи и экспорт.', { store: isMac ? t('Связка ключей') : 'DPAPI' })}
+      </div>
       <ErrorText text={err} />
       {warn && <div className="banner warn small">{warn}</div>}
       <div className="row">
         <button className="btn primary" onClick={() => void save()} disabled={!baseUrl.trim() || (info.needsKey && !key && !initial?.hasKey)}>
-          Сохранить
+          {t('Сохранить')}
         </button>
         {onCancel && (
           <button className="btn ghost" onClick={onCancel}>
-            Отмена
+            {t('Отмена')}
           </button>
         )}
       </div>
@@ -145,10 +148,10 @@ export function ModelSelect({ providerId, value, onChange }: { providerId: strin
     <div className="col" style={{ gap: 4 }}>
       <div className="row">
         {manual || (models && !models.length) ? (
-          <input className="input mono grow" placeholder="ID модели" value={value} onChange={(e) => onChange(e.target.value)} />
+          <input className="input mono grow" placeholder={t('ID модели')} value={value} onChange={(e) => onChange(e.target.value)} />
         ) : (
           <select className="input grow" value={known ? value : ''} onChange={(e) => onChange(e.target.value)}>
-            <option value="">{models ? '— выберите модель —' : 'загрузка…'}</option>
+            <option value="">{models ? t('— выберите модель —') : t('загрузка…')}</option>
             {models?.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.label && m.label !== m.id ? `${m.label} (${m.id})` : m.id}
@@ -157,11 +160,11 @@ export function ModelSelect({ providerId, value, onChange }: { providerId: strin
             ))}
           </select>
         )}
-        <button className="btn sm" title="Обновить список из API" onClick={() => void load(true)}>
+        <button className="btn sm" title={t('Обновить список из API')} onClick={() => void load(true)}>
           ↻
         </button>
         <button className="btn sm ghost" onClick={() => setManual((v) => !v)}>
-          {manual ? 'список' : 'вручную'}
+          {manual ? t('список') : t('вручную')}
         </button>
       </div>
       {err && (
@@ -179,21 +182,21 @@ export function TestResult({ r }: { r: ProviderTestReport | null }) {
     <div className="col small" style={{ gap: 3 }}>
       <div>
         <span className={`dot ${r.models.ok ? 'ok' : 'error'}`} style={{ display: 'inline-block', marginRight: 6 }} />
-        Соединение:{' '}
+        {t('Соединение:')}{' '}
         {r.models.ok
-          ? `ок, ${r.models.models} моделей, ${r.models.latencyMs} мс`
+          ? t('ок, {n} моделей, {ms} мс', { n: r.models.models, ms: r.models.latencyMs })
           : `${r.models.error.message}${r.models.error.detail ? ` — ${r.models.error.detail}` : ''}`}
       </div>
       {r.text && (
         <div>
           <span className={`dot ${r.text.ok ? 'ok' : 'error'}`} style={{ display: 'inline-block', marginRight: 6 }} />
-          Текст: {r.text.ok ? `ок, первый токен ${r.text.ms} мс («${r.text.sample}»)` : r.text.error}
+          {t('Текст:')} {r.text.ok ? t('ок, первый токен {ms} мс («{sample}»)', { ms: r.text.ms ?? '?', sample: r.text.sample ?? '' }) : r.text.error}
         </div>
       )}
       {r.vision && (
         <div>
           <span className={`dot ${r.vision.ok ? 'ok' : 'warn'}`} style={{ display: 'inline-block', marginRight: 6 }} />
-          Изображение: {r.vision.ok ? 'ок, модель видит картинки' : `нет — ${r.vision.error}. Для снимков будет локальный OCR.`}
+          {t('Изображение:')} {r.vision.ok ? t('ок, модель видит картинки') : t('нет — {err}. Для снимков будет локальный OCR.', { err: r.vision.error ?? '' })}
         </div>
       )}
     </div>
@@ -208,7 +211,7 @@ export function RoleRow({ ctx, role, providers }: { ctx: Ctx; role: ModelRole; p
   return (
     <div className="role-row col" style={{ gap: 6 }}>
       <div className="row">
-        <b className="grow">{ROLE_LABEL[role]}</b>
+        <b className="grow">{t(ROLE_LABEL[role])}</b>
         {cur?.model && (
           <button
             className="btn sm"
@@ -223,13 +226,13 @@ export function RoleRow({ ctx, role, providers }: { ctx: Ctx; role: ModelRole; p
               }
             }}
           >
-            {busy ? 'Проверяю…' : 'Проверить соединение'}
+            {busy ? t('Проверяю…') : t('Проверить соединение')}
           </button>
         )}
       </div>
       <div className="row">
         <select className="input" style={{ width: 240 }} value={cur?.providerId ?? ''} onChange={(e) => set(e.target.value, '')}>
-          <option value="">— не использовать —</option>
+          <option value="">{t('— не использовать —')}</option>
           {providers.map((p) => (
             <option key={p.id} value={p.id}>
               {p.label}
@@ -255,9 +258,9 @@ export function ProvidersTab({ ctx }: { ctx: Ctx }) {
     <div className="col" style={{ gap: 16 }}>
       <section className="card col">
         <div className="row between">
-          <h2>Подключённые провайдеры</h2>
+          <h2>{t('Подключённые провайдеры')}</h2>
           <button className="btn" onClick={() => setEditing('new')}>
-            + Добавить
+            + {t('Добавить')}
           </button>
         </div>
         {editing && (
@@ -276,14 +279,14 @@ export function ProvidersTab({ ctx }: { ctx: Ctx }) {
         {providers?.map((p) => (
           <div key={p.id} className="row prov-row">
             <span className={`chip ${/127\.0\.0\.1|localhost/.test(p.baseUrl) ? '' : 'accent'}`}>
-              {/127\.0\.0\.1|localhost/.test(p.baseUrl) ? 'локально' : 'облако'}
+              {/127\.0\.0\.1|localhost/.test(p.baseUrl) ? t('локально') : t('облако')}
             </span>
             <b>{p.label}</b>
             <span className="faint mono small grow">{p.baseUrl}</span>
-            {p.hasKey && <span className="chip">ключ зашифрован</span>}
-            {p.allowFallback && <span className="chip">запасной</span>}
+            {p.hasKey && <span className="chip">{t('ключ зашифрован')}</span>}
+            {p.allowFallback && <span className="chip">{t('запасной')}</span>}
             <button className="btn sm" onClick={() => setEditing(p)}>
-              Изменить
+              {t('Изменить')}
             </button>
             <button
               className="btn sm danger"
@@ -292,17 +295,17 @@ export function ProvidersTab({ ctx }: { ctx: Ctx }) {
                 reload()
               }}
             >
-              Удалить
+              {t('Удалить')}
             </button>
           </div>
         ))}
-        {providers && !providers.length && !editing && <div className="muted small">Пока нет. Для работы без интернета выберите Ollama.</div>}
+        {providers && !providers.length && !editing && <div className="muted small">{t('Пока нет. Для работы без интернета выберите Ollama.')}</div>}
       </section>
 
       {!!providers?.length && (
         <section className="card col" style={{ gap: 16 }}>
-          <h2>Какая модель за что отвечает</h2>
-          <div className="small muted">Список моделей берётся из API провайдера. Новую модель можно вписать вручную.</div>
+          <h2>{t('Какая модель за что отвечает')}</h2>
+          <div className="small muted">{t('Список моделей берётся из API провайдера. Новую модель можно вписать вручную.')}</div>
           {(['quick_answer', 'deep_answer', 'vision'] as ModelRole[]).map((r) => (
             <RoleRow key={r} ctx={ctx} role={r} providers={providers} />
           ))}

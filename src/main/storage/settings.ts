@@ -7,6 +7,7 @@ export const DEFAULT_SETTINGS: Settings = {
   answerLang: 'auto',
   offline: false,
   autoAnswer: false,
+  answerInstructions: '',
   asr: { backend: 'cpu', model: 'base', language: 'ru', vocabulary: ['PostgreSQL', 'FastAPI', 'Kubernetes', 'Docker', 'React', 'TypeScript'], threads: 6 },
   audio: { micDeviceId: null, captureMic: true, captureSystem: true },
   contextWindowMin: 3,

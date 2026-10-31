@@ -1,6 +1,7 @@
 import type { AppError, ErrorCode } from '@shared/types'
 import { ProviderError } from '../net/guard'
 import { redact } from '../storage/redact'
+import { t } from '@shared/i18n'
 
 export { ProviderError }
 
@@ -24,7 +25,7 @@ const MESSAGES: Record<ErrorCode, string> = {
 
 export function appError(code: ErrorCode, detail?: string, status?: number): AppError {
   // Providers echo the rejected key in 401 bodies; detail reaches the UI and the screen may be shared, so I redact it.
-  return { code, message: MESSAGES[code], detail: detail === undefined ? undefined : redact(detail).slice(0, 400), status }
+  return { code, message: t(MESSAGES[code]), detail: detail === undefined ? undefined : redact(detail).slice(0, 400), status }
 }
 
 export function fromHttp(status: number, body: string, headers?: Headers | null): ProviderError {

@@ -3,6 +3,7 @@ import { accessSync, constants, createWriteStream, existsSync, mkdirSync, readdi
 import { delimiter, join } from 'node:path'
 import { spawn } from 'node:child_process'
 import type { FetchFn } from '../providers/adapter'
+import { t } from '@shared/i18n'
 
 export type AsrBackend = 'cpu' | 'cuda'
 
@@ -60,9 +61,10 @@ export const BINARIES: Record<AsrBackend, { url: string; sha256: string; sizeMb:
 const MAC_BIN_DIRS = ['/opt/homebrew/bin', '/usr/local/bin']
 
 /** Homebrew's whisper-cpp is built with Metal on Apple Silicon; there is no prebuilt macOS release zip to download. */
-export const MAC_INSTALL_HINT =
-  'Движок whisper-server не найден. Установите его командой «brew install whisper-cpp» (сборка с Metal) ' +
-  'или соберите whisper.cpp с -DGGML_METAL=ON (scripts/build-whisper-mac.sh), затем нажмите кнопку ещё раз.'
+export const macInstallHint = () =>
+  t(
+    'Движок whisper-server не найден. Установите его командой «brew install whisper-cpp» (сборка с Metal) или соберите whisper.cpp с -DGGML_METAL=ON (scripts/build-whisper-mac.sh), затем нажмите кнопку ещё раз.'
+  )
 
 export interface Progress {
   name: string
@@ -113,25 +115,25 @@ export class AsrAssets {
 
   async downloadModel(name: string, onProgress: (p: Progress) => void, signal?: AbortSignal): Promise<void> {
     const m = MODELS[name]
-    if (!m) throw new Error(`Неизвестная модель ${name}`)
+    if (!m) throw new Error(t('Неизвестная модель {name}', { name }))
     const url = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${m.file}`
     const tmp = this.modelPath(name) + '.part'
-    const sha = await this.download(url, tmp, m.label, onProgress, signal)
+    const sha = await this.download(url, tmp, t(m.label), onProgress, signal)
     if (sha !== m.sha256) {
       rmSync(tmp, { force: true })
-      throw new Error(`Контрольная сумма модели не совпала (${sha.slice(0, 12)}…) — файл удалён`)
+      throw new Error(t('Контрольная сумма модели не совпала ({sha}…) — файл удалён', { sha: sha.slice(0, 12) }))
     }
     renameSync(tmp, this.modelPath(name))
   }
 
   async downloadBinary(backend: AsrBackend, onProgress: (p: Progress) => void, signal?: AbortSignal): Promise<void> {
-    if (this.platform !== 'win32') throw new Error(MAC_INSTALL_HINT)
+    if (this.platform !== 'win32') throw new Error(macInstallHint())
     const b = BINARIES[backend]
     const zip = join(this.root, `${backend}.zip.part`)
     const sha = await this.download(b.url, zip, b.label, onProgress, signal)
     if (sha !== b.sha256) {
       rmSync(zip, { force: true })
-      throw new Error(`Контрольная сумма архива не совпала (${sha.slice(0, 12)}…) — файл удалён`)
+      throw new Error(t('Контрольная сумма архива не совпала ({sha}…) — файл удалён', { sha: sha.slice(0, 12) }))
     }
     const dir = join(this.root, backend)
     rmSync(dir, { recursive: true, force: true })
@@ -139,12 +141,12 @@ export class AsrAssets {
     // bsdtar ships with Windows 10 1803+ and reads zip; a Git/MSYS tar earlier in PATH does not.
     await run(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe'), ['-xf', zip, '-C', dir])
     rmSync(zip, { force: true })
-    if (!this.serverPath(backend)) throw new Error('В архиве нет whisper-server.exe')
+    if (!this.serverPath(backend)) throw new Error(t('В архиве нет whisper-server.exe'))
   }
 
   private async download(url: string, dest: string, name: string, onProgress: (p: Progress) => void, signal?: AbortSignal): Promise<string> {
     const res = await this.fetch(url, { signal, redirect: 'follow' })
-    if (!res.ok || !res.body) throw new Error(`Загрузка не удалась: HTTP ${res.status}`)
+    if (!res.ok || !res.body) throw new Error(t('Загрузка не удалась: HTTP {status}', { status: res.status }))
     const total = Number(res.headers.get('content-length') ?? 0)
     const hash = createHash('sha256')
     const out = createWriteStream(dest)
@@ -199,6 +201,6 @@ function run(cmd: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
     const p = spawn(cmd, args, { windowsHide: true })
     p.on('error', reject)
-    p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`${cmd} завершился с кодом ${code}`))))
+    p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(t('{cmd} завершился с кодом {code}', { cmd, code: String(code) })))))
   })
 }

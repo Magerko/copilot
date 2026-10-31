@@ -46,7 +46,11 @@ export interface QuestionEvent {
 }
 
 export type AnswerKind = 'say' | 'points' | 'deep' | 'screen'
-export type ScreenTask = 'explain' | 'approach' | 'review'
+/**
+ * context — find the question in the last minutes of the conversation and answer it with the capture;
+ * custom — do what the user typed; solve — solve what the capture shows, without conversation or CV.
+ */
+export type ScreenTask = 'context' | 'custom' | 'solve' | 'explain' | 'approach' | 'review'
 export type AnswerStatus = 'streaming' | 'done' | 'cancelled' | 'error' | 'stale' | 'blocked'
 
 export interface Usage {
@@ -205,6 +209,8 @@ export interface Settings {
   answerLang: 'auto' | Lang
   offline: boolean
   autoAnswer: boolean
+  /** The user's own instructions on how answers should sound; added to every answer prompt. */
+  answerInstructions: string
   asr: { backend: 'cpu' | 'cuda'; model: string; language: 'auto' | Lang; vocabulary: string[]; threads: number }
   audio: { micDeviceId: string | null; captureMic: boolean; captureSystem: boolean }
   contextWindowMin: number

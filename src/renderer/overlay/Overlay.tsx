@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AnswerEvent, AppSnapshot, ConvState, Settings } from '@shared/types'
+import type { AnswerEvent, AppSnapshot, ComponentStatus, ConvState, Settings } from '@shared/types'
 import { api, km } from '../lib/api'
 import { useSettingsFeed, useSnapshot } from '../lib/hooks'
 import { setLang, t } from '../lib/i18n'
@@ -22,8 +22,8 @@ const STATE_LABEL: Partial<Record<ConvState, string>> = {
 function provenance(a: AnswerEvent | undefined): string {
   if (!a || !a.model) return ''
   const parts = [a.model]
-  if (a.firstTokenMs != null) parts.push(`${(a.firstTokenMs / 1000).toFixed(1)} с`)
-  if (a.status === 'done') parts.push(a.usageCostUsd == null ? t('Цена неизвестна') : a.usageCostUsd === 0 ? 'локально' : `$${a.usageCostUsd.toFixed(4)}`)
+  if (a.firstTokenMs != null) parts.push(t('{s} с', { s: (a.firstTokenMs / 1000).toFixed(1) }))
+  if (a.status === 'done') parts.push(a.usageCostUsd == null ? t('Цена неизвестна') : a.usageCostUsd === 0 ? t('локально') : `$${a.usageCostUsd.toFixed(4)}`)
   return parts.join(' · ')
 }
 
@@ -114,6 +114,18 @@ export function Overlay() {
   return (
     <div className={`ov ${expanded ? 'expanded' : ''}`} style={style}>
       <header className="ov-bar">
+        <SourceToggle
+          kind="system"
+          on={settings.audio.captureSystem}
+          status={snap.status.system}
+          onClick={() => void api.patchSettings({ audio: { captureSystem: !settings.audio.captureSystem } })}
+        />
+        <SourceToggle
+          kind="mic"
+          on={settings.audio.captureMic}
+          status={snap.status.mic}
+          onClick={() => void api.patchSettings({ audio: { captureMic: !settings.audio.captureMic } })}
+        />
         {snap.sessionId ? (
           <button
             className={`ov-rec ${snap.listening ? 'on' : ''}`}
@@ -203,9 +215,9 @@ export function Overlay() {
           <div ref={inner}>
             {snap.budgetBlocked && (
               <div className="ov-alert">
-                {snap.budgetBlocked}. Платные запросы остановлены.
+                {snap.budgetBlocked}. {t('Платные запросы остановлены.')}
                 <button className="ov-link" onClick={() => void api.approveBudget()}>
-                  Продолжить сверх лимита
+                  {t('Продолжить сверх лимита')}
                 </button>
               </div>
             )}
@@ -229,7 +241,7 @@ export function Overlay() {
                 {q && (
                   <div className="ov-q" title={q.text}>
                     <b className="ov-label">💬 {t('Вопрос')}:</b> {q.text}
-                    {q.revision > 1 && <span className="ov-rev"> · уточнено</span>}
+                    {q.revision > 1 && <span className="ov-rev"> · {t('уточнено')}</span>}
                     <button className="ov-copy" title={t('Копировать')} onClick={() => void api.copy(q.text)}>
                       ⧉
                     </button>
@@ -269,7 +281,7 @@ export function Overlay() {
                 {snap.notice && <div className="ov-note">{snap.notice}</div>}
                 {!q && !snap.candidates.length && snap.sessionId && (
                   <div className="faint ov-hint">
-                    Жду вопрос. <kbd>{pretty(keys.answerNow)}</kbd> — ответить сразу, или нажмите на фразу выше.
+                    {t('Жду вопрос.')} <kbd>{pretty(keys.answerNow)}</kbd> {t('— ответить сразу, или нажмите на фразу выше.')}
                   </div>
                 )}
                 {!snap.sessionId && <div className="faint ov-hint">{t('Сессия не запущена')}</div>}
@@ -279,20 +291,20 @@ export function Overlay() {
                 codes.map((c, i) => (
                   <div key={i} className="ov-code">
                     <button className="ov-link" onClick={() => void api.copy(c)}>
-                      Копировать
+                      {t('Копировать')}
                     </button>
                     <pre>{c}</pre>
                   </div>
                 ))
               ) : (
-                <div className="faint ov-hint">Код появится после «Подробнее» или снимка экрана с режимом «с кодом».</div>
+                <div className="faint ov-hint">{t('Код появится после «Подробнее» или снимка экрана с режимом «с кодом».')}</div>
               )
             ) : (
               <ul className="ov-recent">
                 {snap.recentQuestions.map((r) => (
                   <li key={r.questionId}>{r.text}</li>
                 ))}
-                {!snap.recentQuestions.length && <li className="faint">Пока пусто</li>}
+                {!snap.recentQuestions.length && <li className="faint">{t('Пока пусто')}</li>}
               </ul>
             )}
           </div>
@@ -304,6 +316,30 @@ export function Overlay() {
         </footer>
       </section>
     </div>
+  )
+}
+
+/** Red while that source is actually being captured; crossed out when the user turned it off. */
+function SourceToggle({ kind, on, status, onClick }: { kind: 'mic' | 'system'; on: boolean; status: ComponentStatus; onClick: () => void }) {
+  const live = on && status.state === 'ok'
+  const trouble = on && (status.state === 'error' || status.state === 'warn')
+  const name = kind === 'mic' ? t('Микрофон') : t('Звук компьютера')
+  const title = `${name}: ${on ? status.label || t('включён') : t('выключен — не распознаётся')}`
+  return (
+    <button className={`ov-src ${live ? 'live' : ''} ${on ? '' : 'off'} ${trouble ? 'trouble' : ''}`} title={title} aria-pressed={on} onClick={onClick}>
+      {kind === 'mic' ? (
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          <rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
+          <path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+          <path d="M8 20h8M12 16v4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      )}
+      {live && <span className="ov-src-dot" />}
+    </button>
   )
 }
 

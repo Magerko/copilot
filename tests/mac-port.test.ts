@@ -2,7 +2,7 @@ import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { AsrAssets, MAC_INSTALL_HINT } from '../src/main/asr/assets'
+import { AsrAssets, macInstallHint } from '../src/main/asr/assets'
 import { displayProtectionSupported } from '../src/main/windows/windows'
 
 const noFetch = (() => Promise.reject(new Error('no network in tests'))) as never
@@ -44,8 +44,8 @@ describe('ASR assets on macOS', () => {
 
   it('never downloads the Windows zip and explains how to install instead', async () => {
     const a = new AsrAssets(mkdtempSync(join(tmpdir(), 'asr-')), noFetch, 'darwin', { PATH: '' })
-    await expect(a.downloadBinary('cpu', () => {})).rejects.toThrow(MAC_INSTALL_HINT)
-    expect(MAC_INSTALL_HINT).toContain('brew install whisper-cpp')
+    await expect(a.downloadBinary('cpu', () => {})).rejects.toThrow(macInstallHint())
+    expect(macInstallHint()).toContain('brew install whisper-cpp')
   })
 
   it('keeps the Windows lookup unchanged', () => {

@@ -1,12 +1,13 @@
 import { readFile, stat } from 'node:fs/promises'
 import { extname } from 'node:path'
+import { t } from '@shared/i18n'
 
 const MAX_BYTES = 15 * 1024 * 1024
 
 /** I extract text locally only (FR-C01): nothing leaves the machine during import. */
 export async function extractText(filePath: string): Promise<string> {
   const st = await stat(filePath)
-  if (st.size > MAX_BYTES) throw new Error('Файл больше 15 МБ')
+  if (st.size > MAX_BYTES) throw new Error(t('Файл больше 15 МБ'))
   const ext = extname(filePath).toLowerCase()
   switch (ext) {
     case '.txt':
@@ -21,7 +22,7 @@ export async function extractText(filePath: string): Promise<string> {
     case '.pdf':
       return extractPdf(await readFile(filePath))
     default:
-      throw new Error(`Формат ${ext || 'без расширения'} не поддерживается — используйте PDF, DOCX, TXT или MD`)
+      throw new Error(t('Формат {ext} не поддерживается — используйте PDF, DOCX, TXT или MD', { ext: ext || t('без расширения') }))
   }
 }
 

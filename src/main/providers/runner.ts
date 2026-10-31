@@ -1,6 +1,7 @@
 import type { AppError, ChatRequest } from '@shared/types'
 import type { ProviderAdapter } from './adapter'
 import { appError, isRetryable, toAppError, ProviderError } from './errors'
+import { t } from '@shared/i18n'
 
 export interface RunCallbacks {
   onText(delta: string): void
@@ -82,8 +83,10 @@ export async function runStream(adapter: ProviderAdapter, req: ChatRequest, sign
     } catch (e) {
       clearTimeout(timer)
       if (signal.aborted) throw new ProviderError(appError('cancelled'))
-      const err = timedOut ? appError('timeout', firstTokenMs === null ? `нет ответа за ${opts.timeoutMs} мс` : `ответ замер на ${idleMs} мс`) : toAppError(e)
-      if (firstTokenMs !== null) throw new ProviderError({ ...err, detail: `оборвано после начала ответа: ${err.detail ?? ''}` })
+      const err = timedOut
+        ? appError('timeout', firstTokenMs === null ? t('нет ответа за {ms} мс', { ms: opts.timeoutMs }) : t('ответ замер на {ms} мс', { ms: idleMs }))
+        : toAppError(e)
+      if (firstTokenMs !== null) throw new ProviderError({ ...err, detail: t('оборвано после начала ответа: {detail}', { detail: err.detail ?? '' }) })
       lastErr = err
       if (!isRetryable(err) || attempt === retries) throw new ProviderError(err)
       await sleep(Math.min(5000, err.retryAfterMs ?? (opts.baseDelayMs ?? 600) * 2 ** attempt))

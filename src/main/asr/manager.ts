@@ -1,8 +1,9 @@
 import type { AsrStatus, Lang, Source, TranscriptSegment } from '@shared/types'
 import type { FetchFn } from '../providers/adapter'
-import { AsrAssets, MAC_INSTALL_HINT, MODELS, type AsrBackend } from './assets'
+import { AsrAssets, macInstallHint, MODELS, type AsrBackend } from './assets'
 import type { SileroGate } from './silero'
 import { applyVocabulary, diagnoseWhisperFailure, isHallucination, stripTags, WhisperSidecar } from './whisper'
+import { t } from '@shared/i18n'
 
 // Silero needs at least this much detected speech in a clip; below it the clip is music/noise/silence and never reaches whisper.
 const MIN_SPEECH_S = 0.2
@@ -97,9 +98,9 @@ export class AsrManager {
         ...this.st,
         error: !server
           ? process.platform === 'darwin'
-            ? MAC_INSTALL_HINT
-            : 'Не установлен движок распознавания'
-          : `Нет модели ${MODELS[this.cfg.model]?.label ?? this.cfg.model}`
+            ? macInstallHint()
+            : t('Не установлен движок распознавания')
+          : t('Нет модели {name}', { name: MODELS[this.cfg.model] ? t(MODELS[this.cfg.model].label) : this.cfg.model })
       }
       this.refreshStatus()
       return false
@@ -117,7 +118,7 @@ export class AsrManager {
           const hint = diagnoseWhisperFailure(code, output)
           this.ev.log('asr_exit', { code, hint, output: output.slice(-6) })
           this.sidecar = null
-          this.st = { ...this.st, error: `Распознавание остановилось (код ${code})${hint ? `: ${hint}` : ' — перезапуск'}` }
+          this.st = { ...this.st, error: t('Распознавание остановилось (код {code})', { code: String(code) }) + (hint ? `: ${hint}` : ` — ${t('перезапуск')}`) }
           this.refreshStatus()
           if (this.restarts++ < 3) setTimeout(() => void this.ensure(), 1000)
         }

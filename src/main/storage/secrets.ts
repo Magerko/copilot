@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { registerSecret, unregisterSecret } from './redact'
+import { t } from '@shared/i18n'
 
 export interface Cipher {
   available(): boolean
@@ -50,7 +51,7 @@ export class SecretStore {
   }
 
   set(id: string, value: string): void {
-    if (!this.cipher.available()) throw new Error('Системное шифрование недоступно — ключ не сохранён')
+    if (!this.cipher.available()) throw new Error(t('Системное шифрование недоступно — ключ не сохранён'))
     const old = this.get(id)
     if (old) unregisterSecret(old)
     this.blobs[id] = this.cipher.encrypt(value).toString('base64')

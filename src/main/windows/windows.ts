@@ -2,6 +2,7 @@ import { BrowserWindow, screen, type Rectangle } from 'electron'
 import { join } from 'node:path'
 import { release } from 'node:os'
 import type { OverlaySettings } from '@shared/types'
+import { t } from '@shared/i18n'
 
 const preload = join(__dirname, '../preload/index.js')
 
@@ -87,7 +88,7 @@ export function createOverlay(o: OverlaySettings): BrowserWindow {
     // I make it transparent so the panel background can be semi-see-through while the text stays fully opaque (CSS controls the alpha).
     transparent: true,
     backgroundColor: '#00000000',
-    title: 'Copilot — подсказки',
+    title: t('Copilot — подсказки'),
     webPreferences: { ...webPreferences, backgroundThrottling: false }
   })
   if (o.pinned) win.setAlwaysOnTop(true, 'screen-saver')

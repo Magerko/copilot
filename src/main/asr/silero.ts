@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import type { InferenceSession, Tensor } from 'onnxruntime-node'
+import { t } from '@shared/i18n'
 
 const RATE = 16000
 const CHUNK = 512
@@ -29,7 +30,7 @@ export class SileroGate {
     if (!this.loading)
       this.loading = (async () => {
         try {
-          if (!existsSync(this.modelPath)) throw new Error(`модель Silero не найдена: ${this.modelPath}`)
+          if (!existsSync(this.modelPath)) throw new Error(t('модель Silero не найдена: {path}', { path: this.modelPath }))
           this.ort = await import('onnxruntime-node')
           this.session = await this.ort.InferenceSession.create(this.modelPath, { interOpNumThreads: 1, intraOpNumThreads: 1 })
         } catch (e) {

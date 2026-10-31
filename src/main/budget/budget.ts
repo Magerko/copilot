@@ -1,4 +1,5 @@
 import type { BudgetLimits, ModelPrice } from '@shared/types'
+import { t } from '@shared/i18n'
 
 export type BudgetDecision = { ok: true } | { ok: false; reason: string }
 
@@ -66,10 +67,10 @@ export class BudgetManager {
     if (isLocal) return { ok: true }
     const { perSessionUsd, perDayUsd } = this.limits
     if (perSessionUsd != null && !this.overrideSession && this.sessionUsd >= perSessionUsd) {
-      return { ok: false, reason: `Достигнут лимит $${perSessionUsd} на сессию` }
+      return { ok: false, reason: t('Достигнут лимит ${usd} на сессию', { usd: perSessionUsd }) }
     }
     if (perDayUsd != null && !this.overrideDay && this.dayUsd >= perDayUsd) {
-      return { ok: false, reason: `Достигнут лимит $${perDayUsd} в день` }
+      return { ok: false, reason: t('Достигнут лимит ${usd} в день', { usd: perDayUsd }) }
     }
     return { ok: true }
   }

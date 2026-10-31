@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ScreenTask } from '@shared/types'
 import { api, km, type PickerInit } from '../lib/api'
-import { t } from '../lib/i18n'
+import { setLang, t } from '../lib/i18n'
 
 interface Rect {
   x: number
@@ -26,6 +26,7 @@ export function Picker() {
   const [withCode, setWithCode] = useState(false)
   const [codeLang, setCodeLang] = useState('Python')
   const [busy, setBusy] = useState(false)
+  const [instruction, setInstruction] = useState('')
   const img = useRef<HTMLImageElement>(null)
 
   useEffect(() => km.onPickerInit((m) => setInit(m)), [])
@@ -38,6 +39,7 @@ export function Picker() {
   }, [])
 
   if (!init) return <div className="pk-loading">…</div>
+  setLang(init.uiLang ?? 'ru')
 
   const down = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.pk-bar')) return
@@ -63,6 +65,7 @@ export function Picker() {
 
   const submit = async (task: ScreenTask) => {
     if (!sel || !img.current) return
+    if (task === 'custom' && !instruction.trim()) return
     setBusy(true)
     const el = img.current
     const k = el.naturalWidth / el.clientWidth
@@ -80,7 +83,7 @@ export function Picker() {
       ctx.fillRect(bx, by, bw, bh)
     }
     const png = canvas.toDataURL('image/png').split(',')[1]
-    await api.screen.submit(png, task, withCode, codeLang)
+    await api.screen.submit(png, task, withCode, codeLang, task === 'custom' ? instruction.trim() : '')
   }
 
   return (
@@ -96,13 +99,46 @@ export function Picker() {
       {sel && !drag && (
         <div className="pk-bar" style={barPos(sel)} onMouseDown={(e) => e.stopPropagation()}>
           <div className="row wrap">
-            <button className="btn primary sm" disabled={busy} onClick={() => void submit('explain')}>
+            <button
+              className="btn primary sm"
+              disabled={busy}
+              title={t('Найдёт вопрос в последних 2 минутах разговора и ответит на него вместе со снимком')}
+              onClick={() => void submit('context')}
+            >
+              {t('Вопрос из разговора')}
+            </button>
+            <button className="btn primary sm" disabled={busy} title={t('Только снимок: без разговора и без резюме')} onClick={() => void submit('solve')}>
+              {t('Решить самостоятельно')}
+            </button>
+          </div>
+          <form
+            className="row"
+            style={{ marginTop: 8 }}
+            onSubmit={(e) => {
+              e.preventDefault()
+              void submit('custom')
+            }}
+          >
+            <input
+              className="input grow"
+              style={{ height: 30 }}
+              autoFocus
+              placeholder={t('Своё задание: что сделать со снимком…')}
+              value={instruction}
+              onChange={(e) => setInstruction(e.target.value)}
+            />
+            <button className="btn primary sm" type="submit" disabled={busy || !instruction.trim()}>
+              {t('Отправить')}
+            </button>
+          </form>
+          <div className="row wrap" style={{ marginTop: 8 }}>
+            <button className="btn sm" disabled={busy} onClick={() => void submit('explain')}>
               {t('Объясни условие')}
             </button>
-            <button className="btn primary sm" disabled={busy} onClick={() => void submit('approach')}>
+            <button className="btn sm" disabled={busy} onClick={() => void submit('approach')}>
               {t('Предложи подход')}
             </button>
-            <button className="btn primary sm" disabled={busy} onClick={() => void submit('review')}>
+            <button className="btn sm" disabled={busy} onClick={() => void submit('review')}>
               {t('Разбери код')}
             </button>
           </div>
@@ -126,11 +162,11 @@ export function Picker() {
           </div>
           <div className="faint small" style={{ marginTop: 6 }}>
             {init.hasVision
-              ? 'Отправится только выделенная область, после нажатия кнопки.'
+              ? t('Отправится только выделенная область, после нажатия кнопки.')
               : init.ocr
-                ? 'Модель без vision: текст распознается локально (OCR) и уйдёт текстом.'
-                : 'Нет vision-модели и OCR — установите OCR в «Диагностике».'}
-            {blurMode && ' Обведите личные данные — они будут закрашены.'}
+                ? t('Модель без vision: текст распознается локально (OCR) и уйдёт текстом.')
+                : t('Нет vision-модели и OCR — установите OCR в «Диагностике».')}
+            {blurMode && ` ${t('Обведите личные данные — они будут закрашены.')}`}
           </div>
         </div>
       )}
@@ -149,6 +185,6 @@ function holePath(r: Rect): string {
 }
 
 function barPos(r: Rect): React.CSSProperties {
-  const below = r.y + r.h + 140 < window.innerHeight
-  return { left: Math.min(Math.max(8, r.x), window.innerWidth - 470), top: below ? r.y + r.h + 10 : Math.max(8, r.y - 130) }
+  const below = r.y + r.h + 230 < window.innerHeight
+  return { left: Math.min(Math.max(8, r.x), window.innerWidth - 470), top: below ? r.y + r.h + 10 : Math.max(8, r.y - 220) }
 }

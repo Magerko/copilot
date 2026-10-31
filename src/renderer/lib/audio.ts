@@ -1,5 +1,6 @@
 import type { Source } from '@shared/types'
 import { api, isMac, km } from './api'
+import { t } from './i18n'
 
 const RATE = 16000
 const FRAME = 320 // 20 ms
@@ -148,25 +149,46 @@ export class CaptureController {
   private opts: CaptureOptions | null = null
   private restarts: Record<Source, number> = { user: 0, remote: 0 }
   private outputSig: string | null = null
+  private paused = false
   private onDeviceChange = () => void this.handleDeviceChange()
 
   async start(opts: CaptureOptions): Promise<void> {
     await this.stop()
     this.opts = opts
+    this.paused = false
     this.restarts = { user: 0, remote: 0 }
     navigator.mediaDevices.addEventListener('devicechange', this.onDeviceChange)
     if (opts.captureMic) await this.open('user')
-    else km.sendAudioStatus({ source: 'user', state: 'off', label: 'выключен в настройках' })
+    else km.sendAudioStatus({ source: 'user', state: 'off', label: t('выключен в настройках') })
     if (opts.captureSystem) await this.open('remote')
-    else km.sendAudioStatus({ source: 'remote', state: 'off', label: 'выключен в настройках' })
+    else km.sendAudioStatus({ source: 'remote', state: 'off', label: t('выключен в настройках') })
+  }
+
+  /** Turns one source on or off mid-session; off closes the stream, so nothing from it reaches recognition. */
+  async setSource(source: Source, on: boolean): Promise<void> {
+    const o = this.opts
+    if (!o) return
+    const key = source === 'user' ? 'captureMic' : 'captureSystem'
+    if (o[key] === on) return
+    o[key] = on
+    // While paused I only remember the choice; resume() reopens what is on.
+    if (this.paused) return
+    if (on) {
+      this.restarts[source] = 0
+      await this.open(source)
+    } else {
+      await this.close(source, true)
+      km.sendAudioStatus({ source, state: 'off', label: t('выключен') })
+    }
   }
 
   async pause(): Promise<void> {
     const o = this.opts
     await this.stop()
     this.opts = o
-    km.sendAudioStatus({ source: 'user', state: 'off', label: 'пауза' })
-    km.sendAudioStatus({ source: 'remote', state: 'off', label: 'пауза' })
+    this.paused = true
+    km.sendAudioStatus({ source: 'user', state: 'off', label: t('пауза') })
+    km.sendAudioStatus({ source: 'remote', state: 'off', label: t('пауза') })
   }
 
   async resume(): Promise<void> {
@@ -201,18 +223,19 @@ export class CaptureController {
         ch.level = Math.max(ch.level * 0.85, rms)
       }
       ch.levelTimer = window.setInterval(() => km.sendLevel({ source, rms: ch.level }), 100)
-      for (const t of stream.getAudioTracks()) t.addEventListener('ended', () => void this.reopen(source, 'устройство отключено'))
+      for (const track of stream.getAudioTracks()) track.addEventListener('ended', () => void this.reopen(source, t('устройство отключено')))
       this.channels[source] = ch
       this.restarts[source] = 0 // only consecutive failures should count toward the reopen cap
       if (source === 'remote') this.outputSig = outputSignature(await navigator.mediaDevices.enumerateDevices())
-      const label = stream.getAudioTracks()[0]?.label || (source === 'user' ? 'микрофон' : 'системный звук')
-      km.sendAudioStatus({ source, state: 'ok', label: source === 'remote' ? 'весь системный звук (loopback)' : label })
+      const label = stream.getAudioTracks()[0]?.label || (source === 'user' ? t('микрофон') : t('системный звук'))
+      km.sendAudioStatus({ source, state: 'ok', label: source === 'remote' ? t('весь системный звук (loopback)') : label })
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       km.sendAudioStatus({
         source,
         state: 'error',
-        label: source === 'user' ? `микрофон недоступен: ${msg}. Выберите другое устройство в настройках` : `системный звук недоступен: ${msg}`
+        label:
+          source === 'user' ? t('микрофон недоступен: {msg}. Выберите другое устройство в настройках', { msg }) : t('системный звук недоступен: {msg}', { msg })
       })
     }
   }
@@ -233,7 +256,7 @@ export class CaptureController {
   private async reopen(source: Source, why: string): Promise<void> {
     if (!this.opts || this.restarts[source]++ > 5) return
     await this.close(source, true)
-    km.sendAudioStatus({ source, state: 'warn', label: `${why} — переподключаюсь…` })
+    km.sendAudioStatus({ source, state: 'warn', label: t('{why} — переподключаюсь…', { why }) })
     await new Promise((r) => setTimeout(r, 500))
     await this.open(source)
   }
@@ -245,12 +268,12 @@ export class CaptureController {
     if (mic) {
       const id = mic.stream.getAudioTracks()[0]?.getSettings().deviceId
       const gone = !devices.some((d) => d.kind === 'audioinput' && d.deviceId === id)
-      if (gone || !this.opts.micDeviceId) await this.reopen('user', 'смена микрофона')
+      if (gone || !this.opts.micDeviceId) await this.reopen('user', t('смена микрофона'))
     }
     // Loopback binds to the default output at open time; follow the OS when it switches (speakers → headphones).
     if (this.channels.remote) {
       const sig = outputSignature(devices)
-      if (this.outputSig !== null && sig !== this.outputSig) await this.reopen('remote', 'смена устройства вывода')
+      if (this.outputSig !== null && sig !== this.outputSig) await this.reopen('remote', t('смена устройства вывода'))
       this.outputSig = sig
     }
   }
@@ -279,6 +302,7 @@ async function openMic(deviceId: string | null): Promise<MediaStream> {
   })
 }
 
+// A key, not the text: t() runs when the error is thrown, after the window has set its language.
 export const MAC_SCREEN_HINT =
   'нет доступа «Запись экрана и системного аудио». Разрешите Copilot в Системных настройках → Конфиденциальность и безопасность и перезапустите приложение'
 
@@ -288,14 +312,14 @@ async function openLoopback(): Promise<MediaStream> {
     s = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true })
   } catch (e) {
     // Without the permission Chromium only says NotAllowed/NotSupported, which tells the user nothing.
-    if (isMac && (await api.media.access()).screen !== 'granted') throw new Error(MAC_SCREEN_HINT)
+    if (isMac && (await api.media.access()).screen !== 'granted') throw new Error(t(MAC_SCREEN_HINT))
     throw e
   }
   for (const v of s.getVideoTracks()) {
     v.stop()
     s.removeTrack(v)
   }
-  if (!s.getAudioTracks().length) throw new Error('система не отдала аудиодорожку')
+  if (!s.getAudioTracks().length) throw new Error(t('система не отдала аудиодорожку'))
   return s
 }
 
