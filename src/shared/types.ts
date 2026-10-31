@@ -154,7 +154,7 @@ export interface ModelPrice {
   outputPerMTok: number
 }
 
-export type ProfilePreset = 'hr' | 'backend' | 'frontend' | 'devops' | 'system_design' | 'coding' | 'meeting'
+export type ProfilePreset = 'hr' | 'backend' | 'frontend' | 'devops' | 'qa' | 'system_design' | 'coding' | 'meeting'
 export type AnswerStyle = 'short' | 'natural' | 'academic' | 'english_b2'
 
 export interface Profile {

@@ -10,6 +10,7 @@ export const PRESET_LABEL: Record<Profile['preset'], string> = {
   backend: 'Backend',
   frontend: 'Frontend',
   devops: 'DevOps / SRE',
+  qa: 'QA / тестирование',
   system_design: 'System Design',
   coding: 'Coding-интервью',
   meeting: 'Рабочая встреча'

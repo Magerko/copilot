@@ -45,6 +45,7 @@ const PRESET_HINT: Record<Profile['preset'], string> = {
   backend: 'Backend engineering interview: APIs, databases, concurrency, reliability, trade-offs.',
   frontend: 'Frontend engineering interview: browser, rendering, state, performance, accessibility.',
   devops: 'DevOps/SRE interview: CI/CD, containers, Kubernetes, observability, incident response.',
+  qa: 'QA engineering interview: test design techniques, test levels and the pyramid, bug reports and severity vs priority, API testing, UI and API automation (Playwright, Selenium, Postman), SQL checks, CI integration, flaky tests, release quality.',
   system_design: 'System design interview: requirements, capacity estimates, components, data model, bottlenecks, trade-offs.',
   coding: 'Coding interview: problem restatement, approach, complexity, edge cases.',
   meeting: 'Work meeting: help the user respond constructively and concisely.'
