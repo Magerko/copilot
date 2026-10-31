@@ -1,0 +1,66 @@
+name: Release (macOS)
+
+# Builds the macOS .dmg on a macos runner.
+# - "Run workflow" (workflow_dispatch): pick the branch that carries the mac build config (currently `macos`).
+#   The .dmg is uploaded as a downloadable artifact — handy for testing before macos is merged into main.
+# - push of a v* tag: also attaches the .dmg to the matching GitHub Release (use once macos is merged into main).
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build .dmg
+        run: npm run dist:mac
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: copilot-macos-dmg
+          path: release/*.dmg
+          if-no-files-found: error
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          ver="${GITHUB_REF_NAME#v}"
+          sums=""
+          for f in release/*.dmg; do
+            sums="${sums}\`$(basename "$f")\`: \`$(shasum -a 256 "$f" | awk '{print $1}')\`"$'\n'
+          done
+          notes="Copilot для macOS (Apple Silicon и Intel). Распознавание речи на вашем Mac (whisper.cpp), ответы на вашей модели (BYOK).
+
+          **Установка:** откройте \`.dmg\` и перетащите Copilot в «Программы».
+
+          > Приложение **не подписано** сертификатом Apple — при первом запуске macOS предупредит о неизвестном разработчике.
+          > ПКМ по Copilot → «Открыть» → «Открыть», либо снимите карантин:
+          > \`xattr -dr com.apple.quarantine /Applications/Copilot.app\`
+
+          **Перед первым использованием:** установите движок распознавания — \`brew install whisper-cpp\`.
+          Звук собеседника идёт через разрешение «Запись экрана и системного звука» (Системные настройки → Конфиденциальность), нужен macOS 13+.
+
+          **SHA-256:**
+          ${sums}"
+          files=(release/*.dmg)
+          ls release/*.blockmap >/dev/null 2>&1 && files+=(release/*.blockmap) || true
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --notes "$notes"
+            gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" --title "Copilot ${GITHUB_REF_NAME}" --notes "$notes" "${files[@]}"
+          fi
