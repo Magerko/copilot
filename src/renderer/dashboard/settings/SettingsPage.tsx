@@ -170,6 +170,14 @@ function OverlayTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
           label="Сворачивать в трей при закрытии и сворачивании"
           hint="Окно прячется в значок рядом с часами, приложение и сессия продолжают работать. Полный выход — через меню значка в трее."
         />
+        {isMac && (
+          <Toggle
+            on={ctx.settings.window.hideFromDock}
+            onChange={(v) => void ctx.patch({ window: { hideFromDock: v } })}
+            label="Скрывать из Dock и ⌘Tab"
+            hint="Copilot не виден среди запущенных программ — только значок в строке меню справа вверху. Через него открывается окно и делается выход."
+          />
+        )}
         <Toggle
           on={ctx.settings.window.panicQuits}
           onChange={(v) => void ctx.patch({ window: { panicQuits: v } })}

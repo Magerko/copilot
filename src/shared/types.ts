@@ -226,6 +226,8 @@ export interface WindowSettings {
   protectFromCapture: boolean
   /** Emergency stop fully quits the app (process gone) instead of only stopping capture and hiding the overlay. */
   panicQuits: boolean
+  /** macOS: run as an accessory app — no Dock icon and not in ⌘Tab; the menu bar icon stays. */
+  hideFromDock: boolean
 }
 
 export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }

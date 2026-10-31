@@ -174,6 +174,7 @@ function applySettings(prev: Settings | null): void {
     if (JSON.stringify(prev.overlay.size) !== JSON.stringify(o.size)) applyOverlaySize()
   }
   if (!prev || prev.window.protectFromCapture !== st.window.protectFromCapture) applyWindowProtection()
+  if (!prev || prev.window.hideFromDock !== st.window.hideFromDock) applyDockVisibility()
   updateLlmStatus()
   broadcast('km:settings', st)
 }
@@ -257,7 +258,18 @@ function showDashboard(): void {
   if (!dashboard || dashboard.isDestroyed()) dashboard = makeDashboard()
   if (dashboard.isMinimized()) dashboard.restore()
   dashboard.show()
+  // Without a Dock icon macOS does not bring the app forward on its own when the window is shown from the menu bar.
+  if (process.platform === 'darwin') app.focus({ steal: true })
   dashboard.focus()
+}
+
+function applyDockVisibility(): void {
+  if (process.platform !== 'darwin' || !app.dock) return
+  if (s().window.hideFromDock) app.dock.hide()
+  else {
+    void app.dock.show()
+    if (!app.isPackaged) app.dock.setIcon(nativeImage.createFromBuffer(appIcon(512)))
+  }
 }
 
 function makeDashboard(): BrowserWindow {
@@ -849,8 +861,6 @@ app.whenReady().then(() => {
   refreshTray()
   dashboard = makeDashboard()
   dashboard.setIcon(icon)
-  // In dev the app runs as the stock Electron.app; the packaged build gets its Dock icon from the bundle.
-  if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromBuffer(appIcon(512)))
 })
 
 app.on('second-instance', showDashboard)

@@ -37,7 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   roles: {},
   activeProfileId: 'default',
   consent: { mic: false, system: false, screen: false, cloud: false, history: false, participants: false, acceptedAt: null },
-  window: { minimizeToTray: true, protectFromCapture: true, panicQuits: false }
+  window: { minimizeToTray: true, protectFromCapture: true, panicQuits: false, hideFromDock: true }
 }
 
 export function deepMerge<T>(base: T, patch: DeepPartial<T> | undefined): T {

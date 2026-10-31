@@ -90,13 +90,15 @@
           ]
         }
       ],
+      "identity": "-",
       "hardenedRuntime": true,
       "entitlements": "resources/entitlements.mac.plist",
       "entitlementsInherit": "resources/entitlements.mac.plist",
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Copilot слушает микрофон, чтобы локально распознавать вашу речь во время интервью и встреч.",
         "NSScreenCaptureUsageDescription": "Copilot использует запись экрана для захвата системного звука собеседника и для выбора области экрана с задачей.",
-        "NSAudioCaptureUsageDescription": "Copilot захватывает системный звук, чтобы локально распознавать речь собеседника."
+        "NSAudioCaptureUsageDescription": "Copilot захватывает системный звук, чтобы локально распознавать речь собеседника.",
+        "LSUIElement": true
       }
     },
     "dmg": {
