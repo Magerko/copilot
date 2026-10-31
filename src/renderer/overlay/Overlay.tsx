@@ -3,6 +3,7 @@ import type { AnswerEvent, AppSnapshot, ConvState, Settings } from '@shared/type
 import { api, km } from '../lib/api'
 import { useSettingsFeed, useSnapshot } from '../lib/hooks'
 import { setLang, t } from '../lib/i18n'
+import { pretty } from '../lib/keys'
 import { Markdown } from '../lib/md'
 
 const COMPACT_MIN = 120
@@ -208,7 +209,7 @@ export function Overlay() {
               {snap.notice && <div className="ov-note">{snap.notice}</div>}
               {!q && !live && !snap.candidates.length && snap.sessionId && (
                 <div className="faint ov-hint">
-                  Жду вопрос. <kbd>{settings.shortcuts.answerNow.replace('Control', 'Ctrl')}</kbd> — ответить сразу.
+                  Жду вопрос. <kbd>{pretty(settings.shortcuts.answerNow)}</kbd> — ответить сразу.
                 </div>
               )}
               {!snap.sessionId && <div className="faint ov-hint">{t('Сессия не запущена')}</div>}

@@ -3,6 +3,7 @@ import type { AppSnapshot, SessionStartOptions } from '@shared/types'
 import { api } from '../lib/api'
 import { useAsync } from '../lib/hooks'
 import { t } from '../lib/i18n'
+import { pretty } from '../lib/keys'
 import type { Ctx } from './App'
 import { fmtDate, Status } from './ui'
 
@@ -186,8 +187,4 @@ export function Home({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
       </section>
     </div>
   )
-}
-
-export function pretty(accel: string): string {
-  return accel.replace('Control', 'Ctrl').replace(/\+/g, ' + ')
 }

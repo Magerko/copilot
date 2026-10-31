@@ -2,8 +2,8 @@ import { useState } from 'react'
 import type { AppSnapshot, AsrStatus, DiagReport, ShortcutAction } from '@shared/types'
 import { api, isMac } from '../../lib/api'
 import { useAsync } from '../../lib/hooks'
+import { pretty, toAccelerator } from '../../lib/keys'
 import type { Ctx } from '../App'
-import { pretty } from '../Home'
 import { ErrorText, fmtDate, Section, Toggle } from '../ui'
 import { AudioTab } from './AudioTab'
 import { ProvidersTab } from './Providers'
@@ -167,25 +167,6 @@ const SHORTCUT_LABEL: Record<ShortcutAction, string> = {
   panic: 'Аварийная остановка всего'
 }
 
-function toAccelerator(e: React.KeyboardEvent): string | null {
-  const mods = [e.ctrlKey && 'Control', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'Super'].filter(Boolean) as string[]
-  const k = e.key
-  if (['Control', 'Alt', 'Shift', 'Meta'].includes(k)) return null
-  const map: Record<string, string> = {
-    ' ': 'Space',
-    ArrowUp: 'Up',
-    ArrowDown: 'Down',
-    ArrowLeft: 'Left',
-    ArrowRight: 'Right',
-    Enter: 'Enter',
-    Backspace: 'Backspace',
-    Escape: 'Escape'
-  }
-  const key = map[k] ?? (k.length === 1 ? k.toUpperCase() : k)
-  if (!mods.length && !/^F\d+$/.test(key)) return null
-  return [...mods, key].join('+')
-}
-
 function ShortcutsTab({ ctx }: { ctx: Ctx }) {
   const [rec, setRec] = useState<ShortcutAction | null>(null)
   const [diag] = useAsync(() => api.diagnostics(), [ctx.settings.shortcuts])
@@ -193,7 +174,8 @@ function ShortcutsTab({ ctx }: { ctx: Ctx }) {
   return (
     <Section title="Глобальные горячие клавиши">
       <div className="small muted">
-        Работают из любой программы (IDE, Zoom, OBS) и не перехватывают остальной ввод. Нажмите «Изменить», затем сочетание с Ctrl/Alt/Shift.
+        Работают из любой программы (IDE, Zoom, OBS) и не перехватывают остальной ввод. Нажмите «Изменить», затем сочетание с{' '}
+        {isMac ? '⌘/⌥/⌃/⇧' : 'Ctrl/Alt/Shift'}.
       </div>
       {conflicts && <div className={`banner small ${conflicts.ok ? 'ok' : 'warn'}`}>{conflicts.detail}</div>}
       <div className="col" style={{ gap: 6 }}>
@@ -211,7 +193,7 @@ function ShortcutsTab({ ctx }: { ctx: Ctx }) {
                 onKeyDown={(e) => {
                   e.preventDefault()
                   if (e.key === 'Escape') return setRec(null)
-                  const acc = toAccelerator(e)
+                  const acc = toAccelerator(e.nativeEvent)
                   if (acc) {
                     void ctx.patch({ shortcuts: { [a]: acc } })
                     setRec(null)

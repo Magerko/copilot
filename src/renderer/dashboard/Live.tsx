@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import type { AnswerEvent, AppSnapshot } from '@shared/types'
 import { api } from '../lib/api'
 import { t } from '../lib/i18n'
+import { pretty } from '../lib/keys'
 import { Markdown } from '../lib/md'
 import type { Ctx } from './App'
-import { pretty } from './Home'
 import { Meter } from './ui'
 
 function Prov({ a }: { a?: AnswerEvent }) {
