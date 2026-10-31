@@ -25,7 +25,55 @@ export async function extractText(filePath: string): Promise<string> {
   }
 }
 
+/**
+ * pdfjs runs `new DOMMatrix()` at module load and polyfills it from @napi-rs/canvas, whose native binary exists only
+ * for the platform npm installed on (a build made on another OS ships none). Text extraction never renders, so when the
+ * real class is missing I fall back to a stub instead of failing with "DOMMatrix is not defined".
+ */
+export async function ensureDomMatrix(load: () => Promise<{ DOMMatrix?: unknown }> = () => import('@napi-rs/canvas')): Promise<void> {
+  const g = globalThis as { DOMMatrix?: unknown }
+  if (g.DOMMatrix) return
+  try {
+    const m = await load()
+    if (m.DOMMatrix) {
+      g.DOMMatrix = m.DOMMatrix
+      return
+    }
+  } catch {
+    // native binary missing for this platform — use the stub below
+  }
+  g.DOMMatrix = StubDOMMatrix
+}
+
+class StubDOMMatrix {
+  a = 1
+  b = 0
+  c = 0
+  d = 1
+  e = 0
+  f = 0
+  constructor(init?: number[]) {
+    if (Array.isArray(init) && init.length >= 6) [this.a, this.b, this.c, this.d, this.e, this.f] = init
+  }
+  multiplySelf(): this {
+    return this
+  }
+  preMultiplySelf(): this {
+    return this
+  }
+  invertSelf(): this {
+    return this
+  }
+  translate(): this {
+    return this
+  }
+  scale(): this {
+    return this
+  }
+}
+
 async function extractPdf(data: Buffer): Promise<string> {
+  await ensureDomMatrix()
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
   const doc = await pdfjs.getDocument({ data: new Uint8Array(data), useSystemFonts: true } as never).promise
   const pages: string[] = []

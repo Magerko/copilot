@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ModelInfo, ModelRole, ProviderConfig, ProviderPreset } from '@shared/types'
-import { api, type PresetInfo, type ProviderTestReport } from '../../lib/api'
+import { api, isMac, type PresetInfo, type ProviderTestReport } from '../../lib/api'
 import { useAsync } from '../../lib/hooks'
 import type { Ctx } from '../App'
 import { ErrorText, Toggle } from '../ui'
@@ -105,7 +105,7 @@ export function ProviderForm({
         label="Разрешить как запасной"
         hint="Если основной провайдер недоступен (429/5xx/таймаут), запрос можно отправить сюда. Без этой галочки данные сюда не попадут."
       />
-      <div className="small muted">Ключ шифруется Windows (DPAPI) и не попадает в настройки, логи и экспорт.</div>
+      <div className="small muted">Ключ шифруется системным хранилищем ({isMac ? 'Связка ключей' : 'DPAPI'}) и не попадает в настройки, логи и экспорт.</div>
       <ErrorText text={err} />
       {warn && <div className="banner warn small">{warn}</div>}
       <div className="row">
@@ -280,7 +280,7 @@ export function ProvidersTab({ ctx }: { ctx: Ctx }) {
             </span>
             <b>{p.label}</b>
             <span className="faint mono small grow">{p.baseUrl}</span>
-            {p.hasKey && <span className="chip">ключ в DPAPI</span>}
+            {p.hasKey && <span className="chip">ключ зашифрован</span>}
             {p.allowFallback && <span className="chip">запасной</span>}
             <button className="btn sm" onClick={() => setEditing(p)}>
               Изменить

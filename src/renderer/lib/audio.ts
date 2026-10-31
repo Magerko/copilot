@@ -1,5 +1,5 @@
 import type { Source } from '@shared/types'
-import { km } from './api'
+import { api, isMac, km } from './api'
 
 const RATE = 16000
 const FRAME = 320 // 20 ms
@@ -206,7 +206,7 @@ export class CaptureController {
       this.restarts[source] = 0 // only consecutive failures should count toward the reopen cap
       if (source === 'remote') this.outputSig = outputSignature(await navigator.mediaDevices.enumerateDevices())
       const label = stream.getAudioTracks()[0]?.label || (source === 'user' ? 'микрофон' : 'системный звук')
-      km.sendAudioStatus({ source, state: 'ok', label: source === 'remote' ? 'весь звук Windows (loopback)' : label })
+      km.sendAudioStatus({ source, state: 'ok', label: source === 'remote' ? 'весь системный звук (loopback)' : label })
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       km.sendAudioStatus({
@@ -247,7 +247,7 @@ export class CaptureController {
       const gone = !devices.some((d) => d.kind === 'audioinput' && d.deviceId === id)
       if (gone || !this.opts.micDeviceId) await this.reopen('user', 'смена микрофона')
     }
-    // Loopback binds to the default output at open time; follow Windows when it switches (speakers → headphones).
+    // Loopback binds to the default output at open time; follow the OS when it switches (speakers → headphones).
     if (this.channels.remote) {
       const sig = outputSignature(devices)
       if (this.outputSig !== null && sig !== this.outputSig) await this.reopen('remote', 'смена устройства вывода')
@@ -279,8 +279,18 @@ async function openMic(deviceId: string | null): Promise<MediaStream> {
   })
 }
 
+export const MAC_SCREEN_HINT =
+  'нет доступа «Запись экрана и системного аудио». Разрешите Copilot в Системных настройках → Конфиденциальность и безопасность и перезапустите приложение'
+
 async function openLoopback(): Promise<MediaStream> {
-  const s = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true })
+  let s: MediaStream
+  try {
+    s = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true })
+  } catch (e) {
+    // Without the permission Chromium only says NotAllowed/NotSupported, which tells the user nothing.
+    if (isMac && (await api.media.access()).screen !== 'granted') throw new Error(MAC_SCREEN_HINT)
+    throw e
+  }
   for (const v of s.getVideoTracks()) {
     v.stop()
     s.removeTrack(v)

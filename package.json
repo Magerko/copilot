@@ -13,10 +13,12 @@
     "test": "vitest run",
     "dist": "electron-vite build && electron-builder --win nsis",
     "icon": "node scripts/make-icon.ts",
-    "dist:dir": "electron-vite build && electron-builder --win dir"
+    "dist:dir": "electron-vite build && electron-builder --win dir",
+    "dist:mac": "electron-vite build && electron-builder --mac dmg --arm64"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",
+    "@napi-rs/canvas": "^0.1.100",
     "mammoth": "^1.13.0",
     "onnxruntime-node": "^1.31.1",
     "pdfjs-dist": "^5.7.284",
@@ -51,7 +53,8 @@
     "asarUnpack": [
       "node_modules/tesseract.js/**",
       "node_modules/tesseract.js-core/**",
-      "node_modules/onnxruntime-node/**"
+      "node_modules/onnxruntime-node/**",
+      "node_modules/@napi-rs/**"
     ],
     "extraResources": [
       {
@@ -75,6 +78,29 @@
       "createDesktopShortcut": true,
       "shortcutName": "Copilot",
       "deleteAppDataOnUninstall": false
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "resources/icon.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "hardenedRuntime": true,
+      "entitlements": "resources/entitlements.mac.plist",
+      "entitlementsInherit": "resources/entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Copilot слушает микрофон, чтобы локально распознавать вашу речь во время интервью и встреч.",
+        "NSScreenCaptureUsageDescription": "Copilot использует запись экрана для захвата системного звука собеседника и для выбора области экрана с задачей.",
+        "NSAudioCaptureUsageDescription": "Copilot захватывает системный звук, чтобы локально распознавать речь собеседника."
+      }
+    },
+    "dmg": {
+      "artifactName": "Copilot-${version}-${arch}.${ext}"
     },
     "electronLanguages": [
       "ru",

@@ -1,6 +1,6 @@
 import type { AsrStatus, Lang, Source, TranscriptSegment } from '@shared/types'
 import type { FetchFn } from '../providers/adapter'
-import { AsrAssets, MODELS, type AsrBackend } from './assets'
+import { AsrAssets, MAC_INSTALL_HINT, MODELS, type AsrBackend } from './assets'
 import type { SileroGate } from './silero'
 import { applyVocabulary, diagnoseWhisperFailure, isHallucination, stripTags, WhisperSidecar } from './whisper'
 
@@ -93,7 +93,14 @@ export class AsrManager {
     if (this.sidecar?.running) return true
     const server = this.assets.serverPath(this.cfg.backend)
     if (!server || !this.assets.hasModel(this.cfg.model)) {
-      this.st = { ...this.st, error: !server ? 'Не установлен движок распознавания' : `Нет модели ${MODELS[this.cfg.model]?.label ?? this.cfg.model}` }
+      this.st = {
+        ...this.st,
+        error: !server
+          ? process.platform === 'darwin'
+            ? MAC_INSTALL_HINT
+            : 'Не установлен движок распознавания'
+          : `Нет модели ${MODELS[this.cfg.model]?.label ?? this.cfg.model}`
+      }
       this.refreshStatus()
       return false
     }

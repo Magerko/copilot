@@ -39,6 +39,7 @@ import { extractText } from './context/importers'
 import { chunkText } from './context/retrieval'
 import { runDiagnostics } from './diagnostics'
 import { exportSession } from './export'
+import { ensureMicrophone, mediaAccess, openPrivacyPane } from './media/permissions'
 import { checkEndpoint, NetGuard } from './net/guard'
 import { PRESETS } from './providers/presets'
 import { ProviderRegistry } from './providers/registry'
@@ -187,7 +188,7 @@ function applyProtection(): void {
     !want
       ? { state: 'off', label: 'выкл.' }
       : !supported
-        ? { state: 'error', label: 'не поддерживается этой версией Windows' }
+        ? { state: 'error', label: 'не поддерживается этой версией системы' }
         : live
           ? { state: 'warn', label: 'флаг установлен — работает не со всеми программами захвата, проверьте у получателя' }
           : { state: 'warn', label: 'включится при показе подсказок' }
@@ -504,15 +505,28 @@ function lockDownSessions(): void {
     if (!allowed) log('renderer_blocked', { url: u.split('?')[0] })
     cb({ cancel: !allowed })
   })
-  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => {
-    cb(permission === 'media' || permission === 'display-capture' || permission === 'clipboard-sanitized-write')
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb, details) => {
+    if (permission === 'media') {
+      const wantsMic = 'mediaTypes' in details && (details.mediaTypes ?? []).includes('audio')
+      if (wantsMic) return void ensureMicrophone().then(cb)
+      return cb(true)
+    }
+    cb(permission === 'display-capture' || permission === 'clipboard-sanitized-write')
   })
   session.defaultSession.setDisplayMediaRequestHandler(
     (_req, cb) => {
-      void desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
-        // I use only the audio loopback; the renderer stops the video track immediately.
-        cb(sources[0] ? { video: sources[0], audio: 'loopback' } : {})
-      })
+      // On macOS the first getSources() registers the app under «Screen & System Audio Recording» and shows the prompt;
+      // until it is granted the call fails or returns nothing, and the renderer reports the missing permission.
+      desktopCapturer
+        .getSources({ types: ['screen'] })
+        .then((sources) => {
+          // I use only the audio loopback; the renderer stops the video track immediately.
+          cb(sources[0] ? { video: sources[0], audio: 'loopback' } : {})
+        })
+        .catch((e: unknown) => {
+          log('display_media_fail', { message: e instanceof Error ? e.message : String(e), access: mediaAccess().screen })
+          cb({})
+        })
     },
     { useSystemPicker: false }
   )
@@ -741,6 +755,8 @@ function registerIpc(): void {
     })
   )
   handle('km:diagnostics:log', () => db.recentDiag(100))
+  handle('km:media:access', () => mediaAccess())
+  handle('km:media:openPrivacy', (kind: 'microphone' | 'screen') => openPrivacyPane(kind))
   handle('km:open', (url: string) => {
     if (/^https:\/\//.test(url)) void shell.openExternal(url)
   })

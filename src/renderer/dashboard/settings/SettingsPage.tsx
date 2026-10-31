@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { AppSnapshot, AsrStatus, DiagReport, ShortcutAction } from '@shared/types'
-import { api } from '../../lib/api'
+import { api, isMac } from '../../lib/api'
 import { useAsync } from '../../lib/hooks'
 import type { Ctx } from '../App'
 import { pretty } from '../Home'
@@ -113,8 +113,9 @@ function OverlayTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
           hint={`Статус: ${snap.status.protection.label}`}
         />
         <div className="banner small">
-          Это системный флаг Windows (SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE). Он <b>не гарантирует</b> невидимость: разные программы захватывают
-          экран по-разному, и мы не обходим средства контроля. Режим тренировки работает полноценно без него.
+          {isMac ? 'Это системный флаг macOS (NSWindowSharingNone).' : 'Это системный флаг Windows (SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE).'} Он{' '}
+          <b>не гарантирует</b> невидимость: разные программы захватывают экран по-разному, и мы не обходим средства контроля. Режим тренировки работает
+          полноценно без него.
         </div>
         <div className="col small">
           <b>Как проверить у себя (2 минуты):</b>
@@ -133,7 +134,7 @@ function OverlayTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
           on={ctx.settings.window.protectFromCapture}
           onChange={(v) => void ctx.patch({ window: { protectFromCapture: v } })}
           label="Скрывать из захвата и главное окно, и выбор области"
-          hint="Тот же флаг Windows. Если на звонке попросят показать экран, окна Copilot не попадут в поток — но вы их видите. Не гарантия: зависит от программы захвата."
+          hint="Тот же системный флаг. Если на звонке попросят показать экран, окна Copilot не попадут в поток — но вы их видите. Не гарантия: зависит от программы захвата."
         />
       </Section>
 
@@ -264,8 +265,9 @@ function PrivacyTab({ ctx }: { ctx: Ctx }) {
       </Section>
       <Section title="Данные">
         <div className="small">
-          История, транскрипты и индексы документов лежат в SQLite в <span className="mono">%APPDATA%\copilot</span>. Ключи — в отдельном файле, зашифрованном
-          Windows (DPAPI). Сырое аудио не сохраняется.
+          История, транскрипты и индексы документов лежат в SQLite в{' '}
+          <span className="mono">{isMac ? '~/Library/Application Support/copilot' : '%APPDATA%\\copilot'}</span>. Ключи — в отдельном файле, зашифрованном
+          системным хранилищем ({isMac ? 'Связка ключей macOS' : 'Windows DPAPI'}). Сырое аудио не сохраняется.
         </div>
         <div className="small muted">
           Важно: то, что приложение не шлёт данные своим серверам, не значит, что данные не уходят провайдеру модели. Облачный провайдер получает текст вопроса

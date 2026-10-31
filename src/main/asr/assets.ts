@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
-import { createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { accessSync, constants, createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs'
+import { delimiter, join } from 'node:path'
 import { spawn } from 'node:child_process'
 import type { FetchFn } from '../providers/adapter'
 
@@ -56,6 +56,14 @@ export const BINARIES: Record<AsrBackend, { url: string; sha256: string; sizeMb:
   }
 }
 
+// Apps started from Finder get a minimal PATH without Homebrew, so I also look in its prefixes explicitly.
+const MAC_BIN_DIRS = ['/opt/homebrew/bin', '/usr/local/bin']
+
+/** Homebrew's whisper-cpp is built with Metal on Apple Silicon; there is no prebuilt macOS release zip to download. */
+export const MAC_INSTALL_HINT =
+  'Движок whisper-server не найден. Установите его командой «brew install whisper-cpp» (сборка с Metal) ' +
+  'или соберите whisper.cpp с -DGGML_METAL=ON (scripts/build-whisper-mac.sh), затем нажмите кнопку ещё раз.'
+
 export interface Progress {
   name: string
   received: number
@@ -65,7 +73,9 @@ export interface Progress {
 export class AsrAssets {
   constructor(
     private root: string,
-    private fetch: FetchFn
+    private fetch: FetchFn,
+    private platform: NodeJS.Platform = process.platform,
+    private env: NodeJS.ProcessEnv = process.env
   ) {
     mkdirSync(join(root, 'models'), { recursive: true })
   }
@@ -79,10 +89,26 @@ export class AsrAssets {
   }
 
   serverPath(backend: AsrBackend): string | null {
+    if (this.platform === 'darwin') return this.macServerPath()
     const dir = join(this.root, backend)
     if (!existsSync(dir)) return null
     const found = findFile(dir, 'whisper-server.exe')
     return found
+  }
+
+  /** On macOS one Metal build serves every backend: a local build in <root>/metal, then PATH, then Homebrew. */
+  private macServerPath(): string | null {
+    const local = join(this.root, 'metal')
+    if (existsSync(local)) {
+      const found = findFile(local, 'whisper-server')
+      if (found && isExecutable(found)) return found
+    }
+    const dirs = [...(this.env.PATH ?? '').split(delimiter).filter(Boolean), ...MAC_BIN_DIRS]
+    for (const d of dirs) {
+      const p = join(d, 'whisper-server')
+      if (isExecutable(p)) return p
+    }
+    return null
   }
 
   async downloadModel(name: string, onProgress: (p: Progress) => void, signal?: AbortSignal): Promise<void> {
@@ -99,6 +125,7 @@ export class AsrAssets {
   }
 
   async downloadBinary(backend: AsrBackend, onProgress: (p: Progress) => void, signal?: AbortSignal): Promise<void> {
+    if (this.platform !== 'win32') throw new Error(MAC_INSTALL_HINT)
     const b = BINARIES[backend]
     const zip = join(this.root, `${backend}.zip.part`)
     const sha = await this.download(b.url, zip, b.label, onProgress, signal)
@@ -157,6 +184,15 @@ function findFile(dir: string, name: string): string | null {
     }
   }
   return null
+}
+
+function isExecutable(p: string): boolean {
+  try {
+    accessSync(p, constants.X_OK)
+    return statSync(p).isFile()
+  } catch {
+    return false
+  }
 }
 
 function run(cmd: string, args: string[]): Promise<void> {

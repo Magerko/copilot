@@ -17,6 +17,7 @@ import type {
 } from '@shared/types'
 
 interface Bridge {
+  platform: string
   invoke<T>(channel: string, ...args: unknown[]): Promise<T>
   onSnapshot(cb: (s: AppSnapshot) => void): () => void
   onSettings(cb: (s: Settings) => void): () => void
@@ -57,6 +58,13 @@ export interface InitialState {
   version: string
 }
 
+export type MediaAccess = 'granted' | 'denied' | 'restricted' | 'not-determined' | 'unknown'
+export interface MediaAccessReport {
+  gated: boolean
+  microphone: MediaAccess
+  screen: MediaAccess
+}
+
 export interface ProviderTestReport {
   models: { ok: true; latencyMs: number; models: number } | { ok: false; error: { code: string; message: string; detail?: string } }
   text: { ok: boolean; ms: number | null; sample?: string; error?: string } | null
@@ -65,6 +73,7 @@ export interface ProviderTestReport {
 
 export const km = (window as unknown as { km: Bridge }).km
 const call = km.invoke
+export const isMac = km.platform === 'darwin'
 
 export const api = {
   state: () => call<InitialState>('km:getState'),
@@ -132,6 +141,10 @@ export const api = {
   },
   installOcr: () => call<void>('km:ocr:install'),
   hasNvidia: () => call<boolean>('km:gpu'),
+  media: {
+    access: () => call<MediaAccessReport>('km:media:access'),
+    openPrivacy: (kind: 'microphone' | 'screen') => call<void>('km:media:openPrivacy', kind)
+  },
   diagnostics: () => call<DiagReport>('km:diagnostics'),
   diagLog: () => call<{ at: number; kind: string; data: string }[]>('km:diagnostics:log'),
   open: (url: string) => call<void>('km:open', url)

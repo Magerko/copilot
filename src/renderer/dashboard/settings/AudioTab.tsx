@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { AsrStatus, Lang, Source } from '@shared/types'
-import { api } from '../../lib/api'
+import { api, isMac, type MediaAccessReport } from '../../lib/api'
 import { probeLevel } from '../../lib/audio'
 import type { Ctx } from '../App'
 import { ErrorText, Meter, Toggle } from '../ui'
 
-const ASR_OPTIONS = [
+const WIN_ASR_OPTIONS = [
   { backend: 'cpu' as const, model: 'base', title: 'Быстрый (процессор)', size: '≈160 МБ', note: '≈1 с на фразу на CPU. Подходит всем.' },
   { backend: 'cpu' as const, model: 'small', title: 'Точнее (процессор)', size: '≈500 МБ', note: '≈2 с на фразу — медленнее, но лучше на акцентах.' },
   {
@@ -16,6 +16,15 @@ const ASR_OPTIONS = [
     note: '≈0.1 с на фразу и лучшая точность. Первый запуск прогревается до 30 с.'
   }
 ]
+
+// whisper.cpp on Apple Silicon runs on Metal regardless of backend, so I keep 'cpu' as the stored value and drop CUDA.
+const MAC_ASR_OPTIONS = [
+  { backend: 'cpu' as const, model: 'base', title: 'Быстрый', size: '≈150 МБ', note: 'Metal на Apple Silicon — доли секунды на фразу.' },
+  { backend: 'cpu' as const, model: 'small', title: 'Точнее', size: '≈490 МБ', note: 'Лучше на акцентах, всё ещё быстро на M-серии.' },
+  { backend: 'cpu' as const, model: 'turbo', title: 'Максимум', size: '≈580 МБ', note: 'Large v3 Turbo — лучшая точность. Первый запуск прогревается.' }
+]
+
+const ASR_OPTIONS = isMac ? MAC_ASR_OPTIONS : WIN_ASR_OPTIONS
 
 // A fixed language is ~1.5× faster on CPU (spike S2, audit 2026-10-28) and never turns speech into a translation.
 export const ASR_LANG_OPTIONS = (
@@ -32,7 +41,7 @@ export function AsrInstaller({ ctx, asr, compact }: { ctx: Ctx; asr: AsrStatus |
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   useEffect(() => {
-    void api.hasNvidia().then(setNvidia)
+    if (!isMac) void api.hasNvidia().then(setNvidia)
   }, [])
   const cur = ctx.settings.asr
   const dl = asr?.download
@@ -51,6 +60,12 @@ export function AsrInstaller({ ctx, asr, compact }: { ctx: Ctx; asr: AsrStatus |
 
   return (
     <div className="col">
+      {isMac && asr && !asr.binary && (
+        <div className="small muted">
+          На macOS движок ставится отдельно: <code>brew install whisper-cpp</code> (собран с Metal) или <code>scripts/build-whisper-mac.sh</code>. Модель
+          приложение скачает само.
+        </div>
+      )}
       <div className="asr-grid">
         {ASR_OPTIONS.filter((o) => !compact || o.model !== 'small').map((o) => {
           const active = cur.backend === o.backend && cur.model === o.model
@@ -87,6 +102,36 @@ export function AsrInstaller({ ctx, asr, compact }: { ctx: Ctx; asr: AsrStatus |
   )
 }
 
+/** macOS gates mic and system audio per app; I show what is missing and a shortcut to the right Settings pane. */
+function MacPermissions() {
+  const [acc, setAcc] = useState<MediaAccessReport | null>(null)
+  useEffect(() => {
+    const load = () => void api.media.access().then(setAcc)
+    load()
+    window.addEventListener('focus', load)
+    return () => window.removeEventListener('focus', load)
+  }, [])
+  if (!acc?.gated) return null
+  const missing = (['microphone', 'screen'] as const).filter((k) => acc[k] !== 'granted' && acc[k] !== 'not-determined')
+  if (!missing.length) return null
+  return (
+    <div className="banner warn small col" style={{ gap: 6 }}>
+      <span>
+        macOS не дал доступ:{' '}
+        {missing.map((k) => (k === 'microphone' ? '«Микрофон»' : '«Запись экрана и системного аудио» (нужна для звука собеседника)')).join(', ')}. После
+        включения перезапустите Copilot.
+      </span>
+      <div className="row">
+        {missing.map((k) => (
+          <button key={k} className="btn sm" onClick={() => void api.media.openPrivacy(k)}>
+            Открыть настройки: {k === 'microphone' ? 'Микрофон' : 'Запись экрана'}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function Probe({ source, deviceId }: { source: Source; deviceId: string | null }) {
   const [level, setLevel] = useState(0)
   const [verdict, setVerdict] = useState<string | null>(null)
@@ -102,7 +147,7 @@ function Probe({ source, deviceId }: { source: Source; deviceId: string | null }
           : max > 0.004
             ? 'Очень тихо — проверьте громкость.'
             : source === 'user'
-              ? 'Тишина. Проверьте выбранный микрофон и его громкость в Windows.'
+              ? `Тишина. Проверьте выбранный микрофон и его громкость в ${isMac ? 'Системных настройках → Звук' : 'Windows'}.`
               : 'Тишина. Включите звук в звонке/видео во время проверки.'
       )
     } catch (e) {
@@ -145,32 +190,39 @@ export function DeviceSettings({ ctx }: { ctx: Ctx }) {
   }, [])
   const a = ctx.settings.audio
   return (
-    <div className="grid2">
-      <div className="col">
-        <Toggle on={a.captureMic} onChange={(v) => void ctx.patch({ audio: { captureMic: v } })} label="Мой микрофон" hint="Ваша речь — источник «user»" />
-        <select className="input" value={a.micDeviceId ?? ''} onChange={(e) => void ctx.patch({ audio: { micDeviceId: e.target.value || null } })}>
-          <option value="">Системный по умолчанию</option>
-          {mics
-            .filter((m) => m.deviceId && m.deviceId !== 'default' && m.deviceId !== 'communications')
-            .map((m) => (
-              <option key={m.deviceId} value={m.deviceId}>
-                {m.label || 'Микрофон'}
-              </option>
-            ))}
-        </select>
-        <Probe source="user" deviceId={a.micDeviceId} />
+    <>
+      {isMac && <MacPermissions />}
+      <div className="grid2">
+        <div className="col">
+          <Toggle on={a.captureMic} onChange={(v) => void ctx.patch({ audio: { captureMic: v } })} label="Мой микрофон" hint="Ваша речь — источник «user»" />
+          <select className="input" value={a.micDeviceId ?? ''} onChange={(e) => void ctx.patch({ audio: { micDeviceId: e.target.value || null } })}>
+            <option value="">Системный по умолчанию</option>
+            {mics
+              .filter((m) => m.deviceId && m.deviceId !== 'default' && m.deviceId !== 'communications')
+              .map((m) => (
+                <option key={m.deviceId} value={m.deviceId}>
+                  {m.label || 'Микрофон'}
+                </option>
+              ))}
+          </select>
+          <Probe source="user" deviceId={a.micDeviceId} />
+        </div>
+        <div className="col">
+          <Toggle
+            on={a.captureSystem}
+            onChange={(v) => void ctx.patch({ audio: { captureSystem: v } })}
+            label="Звук собеседника (системный звук)"
+            hint={
+              isMac
+                ? 'Весь системный звук через ScreenCaptureKit — нужен доступ «Запись экрана». Захват отдельного приложения пока не поддерживается.'
+                : 'WASAPI loopback: весь звук, который играет Windows. Захват отдельного приложения пока не поддерживается.'
+            }
+          />
+          <div className="small muted">Совет: наушники убирают эхо собеседника в микрофоне.</div>
+          <Probe source="remote" deviceId={null} />
+        </div>
       </div>
-      <div className="col">
-        <Toggle
-          on={a.captureSystem}
-          onChange={(v) => void ctx.patch({ audio: { captureSystem: v } })}
-          label="Звук собеседника (системный звук)"
-          hint="WASAPI loopback: весь звук, который играет Windows. Захват отдельного приложения пока не поддерживается."
-        />
-        <div className="small muted">Совет: наушники убирают эхо собеседника в микрофоне.</div>
-        <Probe source="remote" deviceId={null} />
-      </div>
-    </div>
+    </>
   )
 }
 

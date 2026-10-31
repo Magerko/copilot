@@ -37,10 +37,14 @@ export function createDashboard(): BrowserWindow {
   return win
 }
 
-/** WDA_EXCLUDEFROMCAPTURE exists since Windows 10 2004 (build 19041). */
-export function displayProtectionSupported(): boolean {
-  if (process.platform !== 'win32') return false
-  const build = Number(release().split('.')[2] ?? 0)
+/**
+ * WDA_EXCLUDEFROMCAPTURE exists since Windows 10 2004 (build 19041). On macOS Electron sets NSWindowSharingNone,
+ * which every supported version accepts, though ScreenCaptureKit-based tools may still capture the window.
+ */
+export function displayProtectionSupported(platform: NodeJS.Platform = process.platform, osRelease = release()): boolean {
+  if (platform === 'darwin') return true
+  if (platform !== 'win32') return false
+  const build = Number(osRelease.split('.')[2] ?? 0)
   return build >= 19041
 }
 

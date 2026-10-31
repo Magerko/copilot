@@ -26,9 +26,11 @@ export async function runDiagnostics(d: DiagDeps): Promise<DiagReport> {
 
   add(
     'secrets',
-    'Хранилище ключей (DPAPI)',
+    'Хранилище ключей',
     d.secretsOk,
-    d.secretsOk ? 'Ключи шифруются системой Windows под вашей учётной записью' : 'Шифрование недоступно — ключи не сохраняются'
+    d.secretsOk
+      ? `Ключи шифруются системой (${process.platform === 'darwin' ? 'Связка ключей macOS' : 'Windows DPAPI'}) под вашей учётной записью`
+      : 'Шифрование недоступно — ключи не сохраняются'
   )
 
   const st = d.asr.status
@@ -72,8 +74,8 @@ export async function runDiagnostics(d: DiagDeps): Promise<DiagReport> {
     'Защита окна подсказок от захвата',
     d.protectionSupported ? null : false,
     d.protectionSupported
-      ? 'Системный флаг WDA_EXCLUDEFROMCAPTURE доступен. Результат зависит от способа захвата — проверьте у получателя: начните демонстрацию экрана и попросите собеседника сказать, видно ли окно подсказок.'
-      : 'Нужна Windows 10 2004 или новее'
+      ? `Системный флаг ${process.platform === 'darwin' ? 'NSWindowSharingNone' : 'WDA_EXCLUDEFROMCAPTURE'} доступен. Результат зависит от способа захвата — проверьте у получателя: начните демонстрацию экрана и попросите собеседника сказать, видно ли окно подсказок.`
+      : 'Нужна Windows 10 2004 или новее, либо macOS'
   )
 
   if (d.settings.offline) {

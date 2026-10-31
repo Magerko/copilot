@@ -8,8 +8,8 @@ export interface Cipher {
 }
 
 /**
- * I never let keys touch settings.json or SQLite. The file holds only DPAPI blobs (Electron safeStorage),
- * which decrypt solely under the same Windows user.
+ * I never let keys touch settings.json or SQLite. The file holds only Electron safeStorage blobs
+ * (DPAPI on Windows, a Keychain-held key on macOS), which decrypt solely under the same OS user.
  */
 export class SecretStore {
   private blobs: Record<string, string> = {}
@@ -50,7 +50,7 @@ export class SecretStore {
   }
 
   set(id: string, value: string): void {
-    if (!this.cipher.available()) throw new Error('Системное шифрование (DPAPI) недоступно — ключ не сохранён')
+    if (!this.cipher.available()) throw new Error('Системное шифрование недоступно — ключ не сохранён')
     const old = this.get(id)
     if (old) unregisterSecret(old)
     this.blobs[id] = this.cipher.encrypt(value).toString('base64')
