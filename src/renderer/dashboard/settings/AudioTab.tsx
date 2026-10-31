@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { AsrStatus, Lang, Source } from '@shared/types'
-import { api } from '../../lib/api'
+import { api, isMac } from '../../lib/api'
 import { probeLevel } from '../../lib/audio'
 import type { Ctx } from '../App'
 import { ErrorText, Meter, Toggle } from '../ui'
@@ -165,7 +165,11 @@ export function DeviceSettings({ ctx }: { ctx: Ctx }) {
           on={a.captureSystem}
           onChange={(v) => void ctx.patch({ audio: { captureSystem: v } })}
           label="Звук собеседника (системный звук)"
-          hint="WASAPI loopback: весь звук, который играет Windows. Захват отдельного приложения пока не поддерживается."
+          hint={
+            isMac
+              ? 'Весь звук, который играет Mac (ScreenCaptureKit). Нужно разрешение «Запись экрана и системного звука» в Системных настройках → Конфиденциальность. macOS 13+.'
+              : 'WASAPI loopback: весь звук, который играет Windows. Захват отдельного приложения пока не поддерживается.'
+          }
         />
         <div className="small muted">Совет: наушники убирают эхо собеседника в микрофоне.</div>
         <Probe source="remote" deviceId={null} />

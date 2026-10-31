@@ -206,7 +206,7 @@ export class CaptureController {
       this.restarts[source] = 0 // only consecutive failures should count toward the reopen cap
       if (source === 'remote') this.outputSig = outputSignature(await navigator.mediaDevices.enumerateDevices())
       const label = stream.getAudioTracks()[0]?.label || (source === 'user' ? 'микрофон' : 'системный звук')
-      km.sendAudioStatus({ source, state: 'ok', label: source === 'remote' ? 'весь звук Windows (loopback)' : label })
+      km.sendAudioStatus({ source, state: 'ok', label: source === 'remote' ? 'весь системный звук (loopback)' : label })
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       km.sendAudioStatus({
@@ -280,7 +280,10 @@ async function openMic(deviceId: string | null): Promise<MediaStream> {
 }
 
 async function openLoopback(): Promise<MediaStream> {
-  const s = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true })
+  const s = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true }).catch((e: unknown) => {
+    if (km.platform !== 'darwin') throw e
+    throw new Error('нет разрешения. Системные настройки → Конфиденциальность → «Запись экрана и системного звука» → включите Copilot и перезапустите его')
+  })
   for (const v of s.getVideoTracks()) {
     v.stop()
     s.removeTrack(v)

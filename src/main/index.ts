@@ -12,6 +12,7 @@ import {
   screen,
   session,
   shell,
+  systemPreferences,
   Tray
 } from 'electron'
 import { randomUUID } from 'node:crypto'
@@ -52,7 +53,10 @@ import { SettingsStore } from './storage/settings'
 import { appIcon } from './util/png'
 import { createDashboard, createOverlay, createPicker, displayProtectionSupported, sanitizeBounds } from './windows/windows'
 
-app.setAppUserModelId('app.copilot')
+const isMac = process.platform === 'darwin'
+if (process.platform === 'win32') app.setAppUserModelId('app.copilot')
+// Chromium exposes macOS system-audio loopback (ScreenCaptureKit, macOS 13+) only behind these features; Windows uses WASAPI without them.
+if (isMac) app.commandLine.appendSwitch('enable-features', 'MacLoopbackAudioForScreenShare,MacSckSystemAudioLoopbackOverride')
 // I keep runtime data outside OneDrive/Cyrillic paths: whisper.cpp opens model files with ANSI APIs.
 // The app was renamed kairos-m → copilot; I move the old data folder once so settings and models carry over.
 const dataHome = app.getPath('appData')
@@ -189,7 +193,12 @@ function applyProtection(): void {
       : !supported
         ? { state: 'error', label: 'не поддерживается этой версией Windows' }
         : live
-          ? { state: 'warn', label: 'флаг установлен — работает не со всеми программами захвата, проверьте у получателя' }
+          ? {
+              state: 'warn',
+              label: isMac
+                ? 'флаг установлен, но Zoom, Meet и другие программы на ScreenCaptureKit его игнорируют — показывайте отдельное окно, а не весь экран'
+                : 'флаг установлен — работает не со всеми программами захвата, проверьте у получателя'
+            }
           : { state: 'warn', label: 'включится при показе подсказок' }
   )
 }
@@ -225,6 +234,8 @@ function showOverlay(): void {
   w.setBounds(sanitizeBounds(w.getBounds()))
   // I show it inactive so the foreground window (IDE, Zoom) keeps keyboard focus (spike S1).
   w.showInactive()
+  // The overlay never activates the app, so on macOS it would otherwise open behind whatever is in front.
+  if (isMac) app.focus({ steal: true })
   sessionMgr.setStatus('overlay', { state: 'ok', label: s().overlay.expanded ? 'развёрнут' : 'компактный' })
 }
 
@@ -511,7 +522,8 @@ function lockDownSessions(): void {
     (_req, cb) => {
       void desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
         // I use only the audio loopback; the renderer stops the video track immediately.
-        cb(sources[0] ? { video: sources[0], audio: 'loopback' } : {})
+        // null (not {}) rejects getDisplayMedia instead of hanging it — on macOS the screen-recording permission may be absent.
+        cb(sources[0] ? { video: sources[0], audio: 'loopback' } : null)
       })
     },
     { useSystemPicker: false }
@@ -809,12 +821,16 @@ app.whenReady().then(() => {
   applyProtection()
   if (interrupted) sessionMgr.snap.notice = 'Прошлая сессия завершилась аварийно — её транскрипт сохранён в «Истории».'
 
+  // macOS asks for the microphone once per app; asking up front keeps the first session from starting deaf.
+  if (isMac && systemPreferences.getMediaAccessStatus('microphone') === 'not-determined') void systemPreferences.askForMediaAccess('microphone')
+
   const icon = nativeImage.createFromBuffer(appIcon(64))
   tray = new Tray(icon.resize({ width: 16, height: 16 }))
   tray.on('click', showDashboard)
   refreshTray()
   dashboard = makeDashboard()
   dashboard.setIcon(icon)
+  if (isMac) app.dock?.setIcon(icon)
 })
 
 app.on('second-instance', showDashboard)

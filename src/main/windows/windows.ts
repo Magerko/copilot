@@ -37,8 +37,9 @@ export function createDashboard(): BrowserWindow {
   return win
 }
 
-/** WDA_EXCLUDEFROMCAPTURE exists since Windows 10 2004 (build 19041). */
+/** WDA_EXCLUDEFROMCAPTURE since Windows 10 2004 (build 19041); on macOS it maps to NSWindowSharingNone, which ScreenCaptureKit (Zoom/Meet) ignores. */
 export function displayProtectionSupported(): boolean {
+  if (process.platform === 'darwin') return true
   if (process.platform !== 'win32') return false
   const build = Number(release().split('.')[2] ?? 0)
   return build >= 19041
@@ -78,6 +79,8 @@ export function createOverlay(o: OverlaySettings): BrowserWindow {
     alwaysOnTop: o.pinned,
     // I never let it take keyboard focus: typing in the IDE/meeting app keeps going there (FR-O01, FR-O05; spike S1).
     focusable: false,
+    // The window never becomes key, so on macOS a click would otherwise be swallowed instead of reaching the buttons.
+    acceptFirstMouse: true,
     hasShadow: false,
     // I make it transparent so the panel background can be semi-see-through while the text stays fully opaque (CSS controls the alpha).
     transparent: true,
@@ -86,6 +89,8 @@ export function createOverlay(o: OverlaySettings): BrowserWindow {
     webPreferences: { ...webPreferences, backgroundThrottling: false }
   })
   if (o.pinned) win.setAlwaysOnTop(true, 'screen-saver')
+  // macOS keeps full-screen apps (Zoom, Meet) in their own Space; without this the hints stay behind on the desktop.
+  if (process.platform === 'darwin') win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })
   load(win, 'overlay')
   return win
 }

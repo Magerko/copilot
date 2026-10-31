@@ -18,6 +18,7 @@ import type {
 
 interface Bridge {
   invoke<T>(channel: string, ...args: unknown[]): Promise<T>
+  platform: string
   onSnapshot(cb: (s: AppSnapshot) => void): () => void
   onSettings(cb: (s: Settings) => void): () => void
   onAsr(cb: (s: AsrStatus) => void): () => void
@@ -64,6 +65,7 @@ export interface ProviderTestReport {
 }
 
 export const km = (window as unknown as { km: Bridge }).km
+export const isMac = km.platform === 'darwin'
 const call = km.invoke
 
 export const api = {

@@ -18,6 +18,7 @@ function on(channel: string) {
 
 const api = {
   invoke,
+  platform: process.platform,
   onSnapshot: on('km:snapshot'),
   onSettings: on('km:settings'),
   onAsr: on('km:asr'),

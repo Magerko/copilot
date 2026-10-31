@@ -79,6 +79,7 @@ export class AsrAssets {
   }
 
   serverPath(backend: AsrBackend): string | null {
+    if (process.platform === 'darwin') return macServerPath()
     const dir = join(this.root, backend)
     if (!existsSync(dir)) return null
     const found = findFile(dir, 'whisper-server.exe')
@@ -99,6 +100,7 @@ export class AsrAssets {
   }
 
   async downloadBinary(backend: AsrBackend, onProgress: (p: Progress) => void, signal?: AbortSignal): Promise<void> {
+    if (process.platform === 'darwin') return installMacServer(onProgress)
     const b = BINARIES[backend]
     const zip = join(this.root, `${backend}.zip.part`)
     const sha = await this.download(b.url, zip, b.label, onProgress, signal)
@@ -159,9 +161,28 @@ function findFile(dir: string, name: string): string | null {
   return null
 }
 
-function run(cmd: string, args: string[]): Promise<void> {
+// whisper.cpp ships no macOS server binary in its releases; Homebrew's build has whisper-server with Metal.
+const MAC_BIN_DIRS = ['/opt/homebrew/bin', '/usr/local/bin']
+
+function macServerPath(): string | null {
+  for (const dir of MAC_BIN_DIRS) {
+    const p = join(dir, 'whisper-server')
+    if (existsSync(p)) return p
+  }
+  return null
+}
+
+async function installMacServer(onProgress: (p: Progress) => void): Promise<void> {
+  const brew = MAC_BIN_DIRS.map((d) => join(d, 'brew')).find((p) => existsSync(p))
+  if (!brew) throw new Error('Нужен Homebrew (https://brew.sh), затем в Терминале: brew install whisper-cpp')
+  onProgress({ name: 'whisper.cpp (Homebrew)', received: 0, total: 0 })
+  await run(brew, ['install', 'whisper-cpp'], { HOMEBREW_NO_AUTO_UPDATE: '1' })
+  if (!macServerPath()) throw new Error('Homebrew не установил whisper-server — выполните в Терминале: brew install whisper-cpp')
+}
+
+function run(cmd: string, args: string[], env?: Record<string, string>): Promise<void> {
   return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args, { windowsHide: true })
+    const p = spawn(cmd, args, { windowsHide: true, env: env ? { ...process.env, ...env } : process.env })
     p.on('error', reject)
     p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`${cmd} завершился с кодом ${code}`))))
   })
