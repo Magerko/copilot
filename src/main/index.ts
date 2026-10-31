@@ -849,6 +849,8 @@ app.whenReady().then(() => {
   refreshTray()
   dashboard = makeDashboard()
   dashboard.setIcon(icon)
+  // In dev the app runs as the stock Electron.app; the packaged build gets its Dock icon from the bundle.
+  if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromBuffer(appIcon(512)))
 })
 
 app.on('second-instance', showDashboard)
