@@ -2,7 +2,7 @@ import type { AsrStatus, Lang, Source, TranscriptSegment } from '@shared/types'
 import type { FetchFn } from '../providers/adapter'
 import { AsrAssets, MODELS, type AsrBackend } from './assets'
 import type { SileroGate } from './silero'
-import { applyVocabulary, isHallucination, stripTags, WhisperSidecar } from './whisper'
+import { applyVocabulary, diagnoseWhisperFailure, isHallucination, stripTags, WhisperSidecar } from './whisper'
 
 // Silero needs at least this much detected speech in a clip; below it the clip is music/noise/silence and never reaches whisper.
 const MIN_SPEECH_S = 0.2
@@ -106,9 +106,11 @@ export class AsrManager {
           if (/error|fail|cuda|gpu/i.test(line)) this.ev.log('asr_log', line)
         },
         onExit: (code) => {
-          this.ev.log('asr_exit', { code })
+          const output = this.sidecar?.recentOutput ?? []
+          const hint = diagnoseWhisperFailure(code, output)
+          this.ev.log('asr_exit', { code, hint, output: output.slice(-6) })
           this.sidecar = null
-          this.st = { ...this.st, error: `Распознавание остановилось (код ${code}) — перезапуск` }
+          this.st = { ...this.st, error: `Распознавание остановилось (код ${code})${hint ? `: ${hint}` : ' — перезапуск'}` }
           this.refreshStatus()
           if (this.restarts++ < 3) setTimeout(() => void this.ensure(), 1000)
         }
@@ -123,8 +125,10 @@ export class AsrManager {
       void this.sidecar.transcribe(new Int16Array(16000), 'en', '').catch(() => {})
       return true
     } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      this.ev.log('asr_start_fail', { backend: this.cfg.backend, model: this.cfg.model, message })
       this.sidecar = null
-      this.st = { ...this.st, error: e instanceof Error ? e.message : String(e) }
+      this.st = { ...this.st, error: message }
       this.refreshStatus()
       return false
     }

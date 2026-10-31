@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyVocabulary, isHallucination, stripTags } from '../src/main/asr/whisper'
+import { applyVocabulary, diagnoseWhisperFailure, isHallucination, stripTags } from '../src/main/asr/whisper'
 
 const VOCAB = ['PostgreSQL', 'FastAPI', 'Kubernetes', 'Docker', 'React', 'TypeScript']
 
@@ -44,5 +44,30 @@ describe('vocabulary normalization (never invents a term)', () => {
   it('does not mangle an ordinary word near a short term', () => {
     // "React" is short → casing-only match, so the real word "reacts" is left alone.
     expect(applyVocabulary('он reacts на изменения', VOCAB)).toBe('он reacts на изменения')
+  })
+})
+
+describe('whisper-server crash diagnosis', () => {
+  it('spots a missing VC++ runtime (by exit code and by stderr)', () => {
+    // 0xC0000135 (DLL not found) comes back as a signed int32 on Windows.
+    expect(diagnoseWhisperFailure(-1073741515, [])).toMatch(/Visual C\+\+/)
+    expect(diagnoseWhisperFailure(1, ['msvcp140.dll was not found'])).toMatch(/Visual C\+\+/)
+  })
+
+  it('spots an unsupported CPU (no AVX)', () => {
+    expect(diagnoseWhisperFailure(-1073741795, [])).toMatch(/AVX/) // 0xC000001D illegal instruction
+    expect(diagnoseWhisperFailure(1, ['Illegal instruction'])).toMatch(/AVX/)
+  })
+
+  it('spots CUDA, corrupt model, busy port and access violation', () => {
+    expect(diagnoseWhisperFailure(1, ['CUDA error: out of memory'])).toMatch(/CUDA/)
+    expect(diagnoseWhisperFailure(1, ['failed to load model from file'])).toMatch(/модел/)
+    expect(diagnoseWhisperFailure(1, ['error: bind: address already in use'])).toMatch(/порт занят/)
+    expect(diagnoseWhisperFailure(-1073741819, [])).toMatch(/access violation/) // 0xC0000005
+  })
+
+  it('returns null for a clean/unknown exit', () => {
+    expect(diagnoseWhisperFailure(0, ['server listening on 127.0.0.1'])).toBeNull()
+    expect(diagnoseWhisperFailure(null, [])).toBeNull()
   })
 })

@@ -119,10 +119,33 @@ export interface SidecarOptions {
   onLog?: (line: string) => void
 }
 
+// Maps a whisper-server startup crash to an actionable hint. Windows reports exception codes as a signed
+// int32, so I normalize to unsigned before matching the well-known NTSTATUS values.
+export function diagnoseWhisperFailure(exitCode: number | null, lines: string[]): string | null {
+  const text = lines.join('\n').toLowerCase()
+  const u = (exitCode ?? 0) >>> 0
+  if (/msvcp140|vcruntime140|vcomp140|the code execution cannot proceed|не удалось запустить/.test(text) || u === 0xc0000135)
+    return 'не хватает Microsoft Visual C++ Redistributable (x64) — установите его с сайта Microsoft и перезапустите'
+  if (/illegal instruction|invalid opcode|unsupported instruction/.test(text) || u === 0xc000001d)
+    return 'процессор, похоже, без нужных инструкций (AVX) — на старом CPU whisper.cpp может не запускаться'
+  if (/cuda|cublas|nvcuda|cudart|no cuda-capable|cublaslt/.test(text))
+    return 'ошибка CUDA/видеокарты — обновите драйвер NVIDIA или выберите CPU-движок в «Настройки → Распознавание»'
+  if (/failed to load model|invalid model|unknown (model )?architecture|bad magic|wrong magic|ggml_|corrupt/.test(text))
+    return 'файл модели повреждён или несовместим — удалите и скачайте модель заново'
+  if (/address already in use|eaddrinuse|bind.*fail/.test(text)) return 'порт занят другим процессом — закройте лишние копии и попробуйте снова'
+  if (u === 0xc0000005) return 'аварийное завершение (access violation) — возможно, повреждён движок или модель; переустановите распознавание'
+  if (/access is denied|отказано в доступе|0x80070005/.test(text) || u === 0xc0000022)
+    return 'запуск заблокирован (антивирус или права доступа) — добавьте папку приложения в исключения'
+  return null
+}
+
 export class WhisperSidecar {
   private proc: ChildProcess | null = null
   private port = 0
   private stopping = false
+  private exitCode: number | null = null
+  // Last stdout/stderr lines, kept so a startup crash can be explained instead of just "завершился при запуске".
+  private tail: string[] = []
 
   constructor(
     private opts: SidecarOptions,
@@ -133,21 +156,36 @@ export class WhisperSidecar {
     return !!this.proc && this.proc.exitCode === null
   }
 
+  get recentOutput(): string[] {
+    return this.tail
+  }
+
   async start(): Promise<void> {
     this.port = await freePort()
     this.stopping = false
+    this.exitCode = null
+    this.tail = []
     const args = ['-m', this.opts.modelPath, '--host', '127.0.0.1', '--port', String(this.port), '-t', String(this.opts.threads)]
     this.proc = spawn(this.opts.serverPath, args, { cwd: dirname(this.opts.serverPath), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
-    const log = (b: Buffer) => this.opts.onLog?.(b.toString('utf8').trim().slice(0, 300))
-    this.proc.stdout?.on('data', log)
-    this.proc.stderr?.on('data', log)
+    const onData = (b: Buffer) => {
+      for (const line of b.toString('utf8').split('\n')) {
+        const t = line.trim()
+        if (!t) continue
+        this.opts.onLog?.(t.slice(0, 300))
+        this.tail.push(t.slice(0, 200))
+      }
+      if (this.tail.length > 24) this.tail.splice(0, this.tail.length - 24)
+    }
+    this.proc.stdout?.on('data', onData)
+    this.proc.stderr?.on('data', onData)
     this.proc.on('exit', (code) => {
+      this.exitCode = code
       this.proc = null
       if (!this.stopping) this.opts.onExit?.(code)
     })
     const deadline = Date.now() + 60_000
     while (Date.now() < deadline) {
-      if (!this.running) throw new Error('whisper-server завершился при запуске')
+      if (!this.running) throw new Error(this.startupError('whisper-server завершился при запуске'))
       try {
         const r = await this.fetch(`http://127.0.0.1:${this.port}/`, { signal: AbortSignal.timeout(1000) })
         if (r.status < 500) return
@@ -156,7 +194,14 @@ export class WhisperSidecar {
       }
       await new Promise((r) => setTimeout(r, 200))
     }
-    throw new Error('whisper-server не ответил за 60 с')
+    throw new Error(this.startupError('whisper-server не ответил за 60 с'))
+  }
+
+  private startupError(base: string): string {
+    const hint = diagnoseWhisperFailure(this.exitCode, this.tail)
+    const code = this.exitCode != null ? ` (код ${this.exitCode})` : ''
+    const out = this.tail.length ? ` — вывод: ${this.tail.slice(-4).join(' | ')}` : ''
+    return `${base}${code}${hint ? `. ${hint}` : ''}${out}`
   }
 
   stop(): void {
