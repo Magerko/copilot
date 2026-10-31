@@ -8,6 +8,7 @@ export const DEFAULT_SETTINGS: Settings = {
   offline: false,
   autoAnswer: false,
   answerInstructions: '',
+  answerFormat: 'text',
   asr: { backend: 'cpu', model: 'base', language: 'ru', vocabulary: ['PostgreSQL', 'FastAPI', 'Kubernetes', 'Docker', 'React', 'TypeScript'], threads: 6 },
   audio: { micDeviceId: null, captureMic: true, captureSystem: true },
   contextWindowMin: 3,
@@ -30,6 +31,7 @@ export const DEFAULT_SETTINGS: Settings = {
     scrollUp: 'Control+Alt+Up',
     scrollDown: 'Control+Alt+Down',
     expand: 'Control+Alt+E',
+    askTyped: 'Control+Alt+Q',
     panic: 'Control+Alt+Backspace'
   },
   history: true,

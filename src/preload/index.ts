@@ -25,6 +25,7 @@ const api = {
   onCapture: on('km:capture'),
   onScroll: on('km:scroll'),
   onPickerInit: on('km:picker-init'),
+  onTyping: on('km:typing'),
   sendAudio: (m: unknown) => ipcRenderer.send('km:audio', m),
   sendLevel: (m: unknown) => ipcRenderer.send('km:level', m),
   sendAudioStatus: (m: unknown) => ipcRenderer.send('km:audio-status', m)

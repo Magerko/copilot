@@ -238,6 +238,14 @@ export class SessionManager {
     this.handle(this.coord.onUtterance({ source: seg.source, text: seg.text, startMs: seg.startMs, endMs: seg.endMs }), 'auto')
   }
 
+  /**
+   * Cue mode replaces the sentence + talking points pair with one line of cues, and brings the detailed answer along
+   * right away, so the substance is in view while the user speaks from the cues.
+   */
+  private quickKinds(): AnswerKind[] {
+    return this.d.settings().answerFormat === 'cues' ? ['say', 'deep'] : ['say', 'points']
+  }
+
   answerNow(kind: AnswerKind = 'say', trigger: 'manual' | 'hotkey' = 'manual'): void {
     if (!this.coord) return
     if (kind === 'deep' && this.coord.active) {
@@ -307,12 +315,12 @@ export class SessionManager {
       case 'revise': {
         this.applyQuestion(dec.question)
         const auto = via === 'manual' || s.autoAnswer
-        if (auto) this.generate(dec.question, ['say', 'points'])
+        if (auto) this.generate(dec.question, this.quickKinds())
         else this.snap.state = 'question_confirmed'
         break
       }
       case 'reanswer':
-        this.generate(dec.question, ['say', 'points'])
+        this.generate(dec.question, this.quickKinds())
         break
       case 'expand':
         this.generate(dec.question, ['deep'])
@@ -455,6 +463,7 @@ export class SessionManager {
       kind,
       profile,
       instructions: s.answerInstructions,
+      cues: s.answerFormat === 'cues',
       answerLang: s.answerLang,
       transcript: isolated ? [] : this.finals.filter((f) => f.endMs >= windowStart && f.endMs <= q.endMs + 1000),
       earlierQuestions: (isolated ? [] : (this.coord?.questions ?? []))

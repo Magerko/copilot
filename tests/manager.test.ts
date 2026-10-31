@@ -31,8 +31,19 @@ class FakeAdapter implements ProviderAdapter {
   }
 }
 
-function setup(opts: { local?: boolean; cloudConsent?: boolean; delayMs?: number; failLocal?: boolean; offline?: boolean; history?: boolean } = {}) {
+function setup(
+  opts: {
+    local?: boolean
+    cloudConsent?: boolean
+    delayMs?: number
+    failLocal?: boolean
+    offline?: boolean
+    history?: boolean
+    answerFormat?: 'text' | 'cues'
+  } = {}
+) {
   const settings: Settings = deepMerge(DEFAULT_SETTINGS, {
+    answerFormat: opts.answerFormat ?? 'text',
     autoAnswer: true,
     history: opts.history ?? false,
     offline: opts.offline ?? false,
@@ -127,6 +138,16 @@ describe('SessionManager', () => {
     mgr.start({ mode: 'practice' })
     await mgr.screen(image, null, 'custom', false, 'Python', 'Напиши тест-кейси для цієї форми')
     expect(mgr.snap.activeQuestion?.text).toBe('[Экран] Напиши тест-кейси для цієї форми')
+  })
+
+  it('cue mode asks for cues and the detailed answer — no talking points to read', async () => {
+    const { mgr, adapter } = setup({ answerFormat: 'cues' })
+    mgr.start({ mode: 'practice' })
+    mgr.askTyped('Які є види тестування?')
+    await until(() => mgr.snap.answers.say?.status === 'done' && mgr.snap.answers.deep?.status === 'done')
+    expect(mgr.snap.answers.points).toBeUndefined()
+    expect(adapter.calls).toHaveLength(2)
+    expect(String(adapter.calls[0].messages[0].content)).toContain('2–5 cues')
   })
 
   it('typed question yields say + points and settles in answer_ready', async () => {

@@ -9,6 +9,8 @@ export interface PromptInput {
   profile: Profile
   /** The user's own words on how to answer (Settings → Answers); trusted, but the rules above still win. */
   instructions?: string
+  /** Cue mode: the quick answer becomes 3–5 short cues instead of a sentence to read out. */
+  cues?: boolean
   answerLang: 'auto' | Lang
   transcript: TranscriptSegment[]
   earlierQuestions: string[]
@@ -62,6 +64,23 @@ const FORMAT: Record<Exclude<AnswerKind, 'screen'>, string> = {
 
 /** How far back «question from the conversation» looks for the interviewer's question. */
 export const SCREEN_CONTEXT_MS = 120_000
+
+// A cue is one part of the answer with its specifics. The example is in the answer language: an English example
+// pulled the cues into English even when the rest of the prompt asked for Ukrainian.
+const CUES_EXAMPLE: Record<Lang, string> = {
+  uk: 'Приклад для «Які бувають види тестування?»: "Функціональне: unit, інтеграційне, системне, регресійне → Нефункціональне: навантажувальне, безпека, usability".',
+  ru: 'Пример для «Какие бывают виды тестирования?»: "Функциональное: unit, интеграционное, системное, регрессионное → Нефункциональное: нагрузочное, безопасность, usability".',
+  en: 'Example for "What types of testing are there?": "Functional: unit, integration, system, regression → Non-functional: performance, security, usability".'
+}
+
+function cuesFormat(lang: Lang): string {
+  return [
+    `Write 2–5 cues in ${LANG_NAME[lang]} that outline the answer the user will give in their own words, in the order to say them, separated by " → ".`,
+    'Each cue is one main part of the answer followed by a colon and 2–4 concrete examples or specifics, comma-separated, a few words each. Keep established technical terms as they are.',
+    'Add a fact from <cv>/<notes> only when the question is about the user’s own experience. No intro, no conclusion cue, no full sentences, no markdown, no quotes.',
+    CUES_EXAMPLE[lang]
+  ].join(' ')
+}
 
 const SCREEN_FORMAT: Record<ScreenTask, string> = {
   context:
@@ -117,7 +136,7 @@ export function buildPrompt(p: PromptInput): BuiltPrompt {
           `- The user's own instructions on how to answer (follow them unless they conflict with the rules above):\n${fence(p.instructions.trim()).slice(0, 2000)}`
         ]
       : []),
-    `Format: ${p.kind === 'screen' && p.screen ? screenFormat(p.screen) : FORMAT[p.kind as Exclude<AnswerKind, 'screen'>]}`
+    `Format: ${p.kind === 'screen' && p.screen ? screenFormat(p.screen) : p.kind === 'say' && p.cues ? cuesFormat(lang) : FORMAT[p.kind as Exclude<AnswerKind, 'screen'>]}`
   ].join('\n')
 
   const parts: string[] = []

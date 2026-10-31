@@ -178,7 +178,7 @@ export interface KnowledgeDoc {
   createdAt: number
 }
 
-export type ShortcutAction = 'toggleOverlay' | 'toggleListen' | 'answerNow' | 'snapRegion' | 'scrollUp' | 'scrollDown' | 'expand' | 'panic'
+export type ShortcutAction = 'toggleOverlay' | 'toggleListen' | 'answerNow' | 'snapRegion' | 'scrollUp' | 'scrollDown' | 'expand' | 'askTyped' | 'panic'
 
 export interface OverlaySettings {
   bounds: { x: number; y: number; width: number; height: number } | null
@@ -211,6 +211,8 @@ export interface Settings {
   autoAnswer: boolean
   /** The user's own instructions on how answers should sound; added to every answer prompt. */
   answerInstructions: string
+  /** text — a ready sentence to say plus talking points; cues — 3–5 short cues to answer in your own words. */
+  answerFormat: 'text' | 'cues'
   asr: { backend: 'cpu' | 'cuda'; model: string; language: 'auto' | Lang; vocabulary: string[]; threads: number }
   audio: { micDeviceId: string | null; captureMic: boolean; captureSystem: boolean }
   contextWindowMin: number

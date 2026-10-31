@@ -260,6 +260,49 @@ function showOverlay(): void {
   sessionMgr.setStatus('overlay', { state: 'ok', label: s().overlay.expanded ? t('развёрнут') : t('компактный') })
 }
 
+// Teleprompter size: narrow enough to sit between the camera and the screen centre, tall enough for cues + details.
+const UNDER_CAMERA = { width: 400, height: 550, fontScale: 1.1 }
+
+/**
+ * Teleprompter preset: a narrow window centred right under the menu bar of the display it is on, where the built-in
+ * camera sits, so reading notes during a talk or a work call keeps the eyes near the lens.
+ */
+function placeUnderCamera(): void {
+  const w = ensureOverlay()
+  const display = screen.getDisplayMatching(w.getBounds())
+  const wa = display.workArea
+  const width = Math.min(UNDER_CAMERA.width, wa.width - 48)
+  const height = Math.min(UNDER_CAMERA.height, wa.height - 12)
+  const bounds = { x: Math.round(wa.x + (wa.width - width) / 2), y: wa.y + 6, width, height }
+  w.setBounds(bounds)
+  settings.patch({ overlay: { bounds, displayId: display.id, size: { width, height }, fontScale: UNDER_CAMERA.fontScale } })
+  broadcast('km:settings', s())
+  if (!w.isVisible()) showOverlay()
+}
+
+/**
+ * Typing a question means the overlay must take keyboard focus for a moment — it never does otherwise, so keystrokes
+ * keep going to the call or the IDE. When typing ends I make it unfocusable again and hand focus back.
+ */
+function setOverlayTyping(on: boolean): void {
+  const w = on ? ensureOverlay() : overlay
+  if (!w || w.isDestroyed()) return
+  if (on) {
+    w.setFocusable(true)
+    w.show()
+    w.focus()
+    w.webContents.send('km:typing', true)
+    return
+  }
+  w.webContents.send('km:typing', false)
+  w.setFocusable(false)
+  // On macOS hiding the app returns focus to the app the user was in; I bring the overlay back without activating it.
+  if (process.platform === 'darwin' && !dashboard?.isVisible()) {
+    app.hide()
+    w.showInactive()
+  } else w.blur()
+}
+
 function toggleOverlay(): void {
   if (overlay?.isVisible()) {
     overlay.hide()
@@ -414,6 +457,7 @@ const SHORTCUT_ACTIONS: Record<ShortcutAction, () => void> = {
     broadcast('km:settings', s())
     if (expanded && !sessionMgr.snap.answers.deep) sessionMgr.answerNow('deep', 'hotkey')
   },
+  askTyped: () => setOverlayTyping(true),
   panic
 }
 
@@ -716,6 +760,8 @@ function registerIpc(): void {
   })
 
   handle('km:overlay:toggle', () => toggleOverlay())
+  handle('km:overlay:underCamera', () => placeUnderCamera())
+  handle('km:overlay:typing', (on: boolean) => setOverlayTyping(!!on))
   handle('km:overlay:expand', (v: boolean) => {
     settings.patch({ overlay: { expanded: v } })
     if (v) applyOverlaySize()

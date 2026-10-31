@@ -7,6 +7,8 @@ import { pretty } from '../lib/keys'
 import { Markdown, MarkdownInline } from '../lib/md'
 
 const COMPACT_MIN = 120
+// Longer questions collapse to their first words so the answer keeps the space; a click shows the whole text.
+const QUESTION_WORDS = 10
 
 const STATE_LABEL: Partial<Record<ConvState, string>> = {
   listening: 'Слушаю…',
@@ -45,6 +47,19 @@ export function Overlay() {
   const body = useRef<HTMLDivElement>(null)
   const inner = useRef<HTMLDivElement>(null)
   const chipRow = useRef<HTMLDivElement>(null)
+  const [typing, setTyping] = useState(false)
+  const [typed, setTyped] = useState('')
+  const [qOpen, setQOpen] = useState(false)
+  const qId = snap?.activeQuestion?.questionId
+  useEffect(() => setQOpen(false), [qId])
+  useEffect(() => km.onTyping((on) => setTyping(on)), [])
+  // Clicking away ends typing too, so the overlay goes back to never taking keyboard focus.
+  useEffect(() => {
+    if (!typing) return
+    const onBlur = () => void api.overlay.typing(false)
+    window.addEventListener('blur', onBlur)
+    return () => window.removeEventListener('blur', onBlur)
+  }, [typing])
   const expandedNow = settings?.overlay.expanded ?? false
   const cap = settings?.overlay.size.height ?? 440
   const ready = !!(snap && settings)
@@ -95,6 +110,8 @@ export function Overlay() {
   setLang(settings.uiLang)
   const expanded = settings.overlay.expanded
   const q = snap.activeQuestion
+  const qWords = q ? q.text.split(/\s+/).filter(Boolean) : []
+  const longQ = qWords.length > QUESTION_WORDS
   const live = snap.partial.remote || snap.partial.user
   const errorAns = [a.say, a.points, a.deep, a.screen].find((x) => x?.status === 'error' || x?.status === 'blocked')
   const points = (a.points?.text ?? '')
@@ -146,6 +163,9 @@ export function Overlay() {
         <button className="ov-pill" onClick={() => void api.screen.begin()}>
           {t('Снимок')} <Kbd k={keys.snapRegion} />
         </button>
+        <button className="ov-pill" title={t('Написать вопрос вручную')} onClick={() => void api.overlay.typing(true)}>
+          ✎ <Kbd k={keys.askTyped} />
+        </button>
         <button className="ov-pill" onClick={toggleExpand}>
           {expanded ? t('Свернуть') : t('Подробнее')} <Kbd k={keys.expand} />
         </button>
@@ -165,6 +185,32 @@ export function Overlay() {
           </button>
         )}
       </header>
+
+      {typing && (
+        <form
+          className="ov-ask"
+          onSubmit={(e) => {
+            e.preventDefault()
+            const q = typed.trim()
+            if (q) void api.session.askTyped(q)
+            setTyped('')
+            void api.overlay.typing(false)
+          }}
+        >
+          <input
+            autoFocus
+            value={typed}
+            placeholder={t('Вопрос, который не распознался… Enter — ответить, Esc — отмена')}
+            onChange={(e) => setTyped(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setTyped('')
+                void api.overlay.typing(false)
+              }
+            }}
+          />
+        </form>
+      )}
 
       {chips.length > 0 && (
         <div className="ov-chips" ref={chipRow}>
@@ -239,17 +285,41 @@ export function Overlay() {
             {tab === 'answer' || !expanded ? (
               <>
                 {q && (
-                  <div className="ov-q" title={q.text}>
-                    <b className="ov-label">💬 {t('Вопрос')}:</b> {q.text}
+                  <div className={`ov-q ${longQ ? 'clickable' : ''}`} title={longQ && !qOpen ? q.text : undefined} onClick={() => longQ && setQOpen((v) => !v)}>
+                    <b className="ov-label">{t('Вопрос')}:</b> {longQ && !qOpen ? `${qWords.slice(0, QUESTION_WORDS).join(' ')}…` : q.text}
                     {q.revision > 1 && <span className="ov-rev"> · {t('уточнено')}</span>}
-                    <button className="ov-copy" title={t('Копировать')} onClick={() => void api.copy(q.text)}>
+                    <button
+                      className="ov-copy"
+                      title={t('Копировать')}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void api.copy(q.text)
+                      }}
+                    >
                       ⧉
                     </button>
                   </div>
                 )}
                 {say?.text ? (
                   <div className="ov-say">
-                    <b className="ov-label">⭐ {t('Ответ')}:</b> {say.kind === 'screen' ? <Markdown text={say.text} /> : <MarkdownInline text={say.text} />}
+                    <b className="ov-label">{settings.answerFormat === 'cues' && say.kind === 'say' ? t('Опоры') : t('Ответ')}:</b>{' '}
+                    {say.kind === 'screen' ? (
+                      <Markdown text={say.text} />
+                    ) : settings.answerFormat === 'cues' ? (
+                      // one cue per line: the «→» chain reads as a checklist instead of one long line
+                      <span className="ov-cues">
+                        {say.text
+                          .split(/\s*→\s*/)
+                          .filter(Boolean)
+                          .map((c, i) => (
+                            <span key={i} className="ov-cue">
+                              <Cue text={c} />
+                            </span>
+                          ))}
+                      </span>
+                    ) : (
+                      <MarkdownInline text={say.text} />
+                    )}
                     {say.status === 'streaming' && <span className="caret" />}
                   </div>
                 ) : q && (a.say?.status === 'streaming' || snap.state === 'generating') ? (
@@ -264,7 +334,7 @@ export function Overlay() {
                     ))}
                   </ul>
                 )}
-                {expanded && deep?.text && (
+                {(expanded || settings.answerFormat === 'cues') && deep?.text && (
                   <section className="ov-deep">
                     <Markdown text={deep.text} />
                   </section>
@@ -342,6 +412,17 @@ function SourceToggle({ kind, on, status, onClick }: { kind: 'mic' | 'system'; o
       )}
       {live && <span className="ov-src-dot" />}
     </button>
+  )
+}
+
+/** «Part: examples» — the part before the first colon is the heading the user scans for. */
+function Cue({ text }: { text: string }) {
+  const i = text.indexOf(':')
+  if (i <= 0 || i > 60) return <MarkdownInline text={text} />
+  return (
+    <>
+      <strong>{text.slice(0, i).replace(/\*\*/g, '')}:</strong> <MarkdownInline text={text.slice(i + 1).trim()} />
+    </>
   )
 }
 

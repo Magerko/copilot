@@ -258,5 +258,11 @@ export const DASHBOARD: Dict = {
     'Немає vision-моделі та OCR — встановіть OCR у «Діагностиці».',
     'No vision model or OCR — install OCR in “Diagnostics”.'
   ],
-  'Обведите личные данные — они будут закрашены.': ['Обведіть особисті дані — їх буде замальовано.', 'Draw around personal data — it will be masked.']
+  'Обведите личные данные — они будут закрашены.': ['Обведіть особисті дані — їх буде замальовано.', 'Draw around personal data — it will be masked.'],
+  Опоры: ['Опори', 'Cues'],
+  'Написать вопрос вручную': ['Написати питання вручну', 'Type a question'],
+  'Вопрос, который не распознался… Enter — ответить, Esc — отмена': [
+    'Питання, яке не розпізналось… Enter — відповісти, Esc — скасувати',
+    'A question that was not recognized… Enter to answer, Esc to cancel'
+  ]
 }

@@ -176,6 +176,22 @@ body {
   transform: rotate(-40deg);
 }
 
+/* typed question: a one-line field that appears only while the overlay holds focus */
+.ov-ask {
+  flex: none;
+}
+.ov-ask input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  font: calc(14px * var(--fs, 1)) var(--font);
+  outline: none;
+}
+
 /* ── transcript chips ────────────────────────────────────── */
 .ov-chips {
   display: flex;
@@ -277,12 +293,15 @@ body {
 
 .ov-q {
   position: relative;
-  font-size: 1.05em;
+  font-size: 1.15em;
   font-weight: 500;
   line-height: 1.4;
   padding: 2px 26px 8px 0;
   margin-bottom: 8px;
   border-bottom: 1px solid var(--border);
+}
+.ov-q.clickable {
+  cursor: pointer;
 }
 .ov-rev {
   color: var(--accent);
@@ -303,11 +322,26 @@ body {
 }
 
 .ov-say {
-  font-size: 1.2em;
+  font-size: 1.15em;
   line-height: 1.45;
   font-weight: 500;
   margin-bottom: 8px;
 }
+/* cue mode: each cue on its own line, the part before the colon reads as a heading */
+.ov-cues {
+  display: block;
+  margin-top: 4px;
+}
+.ov-cue {
+  display: block;
+  padding-left: 1em;
+  text-indent: -1em;
+}
+.ov-cue::before {
+  content: '→ ';
+  color: var(--accent);
+}
+
 /* the model marks key terms with **bold**; on a see-through panel weight alone is too subtle */
 .ov-say strong,
 .ov-points strong,

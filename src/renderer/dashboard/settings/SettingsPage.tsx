@@ -49,12 +49,34 @@ function OverlayTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
       <Section
         title={t('Окно подсказок')}
         aside={
-          <button className="btn sm" onClick={() => void api.overlay.toggle()}>
-            {t('Показать / скрыть')}
-          </button>
+          <div className="row">
+            <button
+              className="btn sm"
+              title={t('Окно 400×550 по центру сверху, прямо под камерой, шрифт 110% — как телесуфлер')}
+              onClick={() => void api.overlay.underCamera()}
+            >
+              {t('Поставить под камеру')}
+            </button>
+            <button className="btn sm" onClick={() => void api.overlay.toggle()}>
+              {t('Показать / скрыть')}
+            </button>
+          </div>
         }
       >
         <div className="grid2">
+          <label className="field">
+            <span>{t('Формат подсказки')}</span>
+            <select className="input" value={ctx.settings.answerFormat} onChange={(e) => void ctx.patch({ answerFormat: e.target.value as 'text' | 'cues' })}>
+              <option value="text">{t('Готовый текст и тезисы')}</option>
+              <option value="cues">{t('Опорные тезисы (3–5 ключевых слов)')}</option>
+            </select>
+            <span className="small faint">
+              {ctx.settings.answerFormat === 'cues'
+                ? t('Например: «регрессионное → после каждого релиза → автоматизация в CI». Отвечаете своими словами, тезисы только напоминают структуру.')
+                : t('Готовая фраза, которую можно произнести, и список тезисов под ней.')}
+            </span>
+          </label>
+          <span />
           <label className="field">
             <span>{t('Непрозрачность фона: {n}%', { n: Math.round(o.opacity * 100) })}</span>
             <input
@@ -206,6 +228,7 @@ const SHORTCUT_LABEL: Record<ShortcutAction, string> = {
   scrollUp: 'Прокрутить подсказки вверх',
   scrollDown: 'Прокрутить подсказки вниз',
   expand: 'Развернуть / подробный ответ',
+  askTyped: 'Написать вопрос вручную',
   panic: 'Аварийная остановка всего'
 }
 

@@ -26,6 +26,7 @@ interface Bridge {
   onCapture(cb: (m: CaptureMsg) => void): () => void
   onScroll(cb: (dir: number) => void): () => void
   onPickerInit(cb: (m: PickerInit) => void): () => void
+  onTyping(cb: (on: boolean) => void): () => void
   sendAudio(m: unknown): void
   sendLevel(m: unknown): void
   sendAudioStatus(m: unknown): void
@@ -104,6 +105,8 @@ export const api = {
   preview: () => call<OutgoingPreview>('km:preview'),
   overlay: {
     toggle: () => call<void>('km:overlay:toggle'),
+    underCamera: () => call<void>('km:overlay:underCamera'),
+    typing: (on: boolean) => call<void>('km:overlay:typing', on),
     expand: (v: boolean) => call<void>('km:overlay:expand', v),
     fit: (h: number) => call<void>('km:overlay:fit', h)
   },
