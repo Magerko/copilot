@@ -51,7 +51,7 @@ import { Db } from './storage/db'
 import { redact, redactDeep } from './storage/redact'
 import { SecretStore } from './storage/secrets'
 import { SettingsStore } from './storage/settings'
-import { appIcon } from './util/png'
+import { appIcon, trayTemplateIcon } from './util/png'
 import { createDashboard, createOverlay, createPicker, displayProtectionSupported, sanitizeBounds } from './windows/windows'
 
 app.setAppUserModelId('app.copilot')
@@ -528,6 +528,16 @@ function outgoingPreview(): OutgoingPreview {
   }
 }
 
+/** macOS gets a monochrome template mark that matches the other menu bar icons; Windows keeps the coloured tile. */
+function trayImage(icon: Electron.NativeImage): Electron.NativeImage {
+  if (process.platform !== 'darwin') return icon.resize({ width: 16, height: 16 })
+  const img = nativeImage.createEmpty()
+  img.addRepresentation({ scaleFactor: 1, buffer: trayTemplateIcon(18) })
+  img.addRepresentation({ scaleFactor: 2, buffer: trayTemplateIcon(36) })
+  img.setTemplateImage(true)
+  return img
+}
+
 function refreshTray(): void {
   if (!tray) return
   const active = sessionMgr.active
@@ -902,7 +912,7 @@ app.whenReady().then(() => {
   if (interrupted) sessionMgr.snap.notice = t('Прошлая сессия завершилась аварийно — её транскрипт сохранён в «Истории».')
 
   const icon = nativeImage.createFromBuffer(appIcon(64))
-  tray = new Tray(icon.resize({ width: 16, height: 16 }))
+  tray = new Tray(trayImage(icon))
   tray.on('click', showDashboard)
   refreshTray()
   dashboard = makeDashboard()

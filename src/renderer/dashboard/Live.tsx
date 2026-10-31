@@ -3,7 +3,7 @@ import type { AnswerEvent, AppSnapshot } from '@shared/types'
 import { api } from '../lib/api'
 import { t } from '../lib/i18n'
 import { pretty } from '../lib/keys'
-import { Markdown } from '../lib/md'
+import { Markdown, MarkdownInline } from '../lib/md'
 import type { Ctx } from './App'
 import { Meter } from './ui'
 
@@ -194,7 +194,7 @@ export function Live({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
 
               {(a.say || a.screen) && (
                 <div className="ans-say">
-                  {a.screen ? <Markdown text={a.screen.text} /> : a.say!.text || '…'}
+                  {a.screen ? <Markdown text={a.screen.text} /> : a.say!.text ? <MarkdownInline text={a.say!.text} /> : '…'}
                   <Prov a={a.screen ?? a.say} />
                   {(a.say ?? a.screen)?.error && (
                     <div className="banner error small">

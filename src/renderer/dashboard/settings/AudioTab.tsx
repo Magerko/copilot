@@ -22,7 +22,13 @@ const WIN_ASR_OPTIONS = [
 const MAC_ASR_OPTIONS = [
   { backend: 'cpu' as const, model: 'base', title: 'Быстрый', size: '≈150 МБ', note: 'Metal на Apple Silicon — доли секунды на фразу.' },
   { backend: 'cpu' as const, model: 'small', title: 'Точнее', size: '≈490 МБ', note: 'Лучше на акцентах, всё ещё быстро на M-серии.' },
-  { backend: 'cpu' as const, model: 'turbo', title: 'Максимум', size: '≈580 МБ', note: 'Large v3 Turbo — лучшая точность. Первый запуск прогревается.' }
+  {
+    backend: 'cpu' as const,
+    model: 'turbo',
+    title: 'Максимум',
+    size: '≈580 МБ',
+    note: 'Large v3 Turbo — лучшая точность. После запуска движка — несколько секунд на прогрев.'
+  }
 ]
 
 const ASR_OPTIONS = isMac ? MAC_ASR_OPTIONS : WIN_ASR_OPTIONS

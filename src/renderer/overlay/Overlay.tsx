@@ -4,7 +4,7 @@ import { api, km } from '../lib/api'
 import { useSettingsFeed, useSnapshot } from '../lib/hooks'
 import { setLang, t } from '../lib/i18n'
 import { pretty } from '../lib/keys'
-import { Markdown } from '../lib/md'
+import { Markdown, MarkdownInline } from '../lib/md'
 
 const COMPACT_MIN = 120
 
@@ -249,7 +249,7 @@ export function Overlay() {
                 )}
                 {say?.text ? (
                   <div className="ov-say">
-                    <b className="ov-label">⭐ {t('Ответ')}:</b> {say.kind === 'screen' ? <Markdown text={say.text} /> : say.text}
+                    <b className="ov-label">⭐ {t('Ответ')}:</b> {say.kind === 'screen' ? <Markdown text={say.text} /> : <MarkdownInline text={say.text} />}
                     {say.status === 'streaming' && <span className="caret" />}
                   </div>
                 ) : q && (a.say?.status === 'streaming' || snap.state === 'generating') ? (
@@ -258,7 +258,9 @@ export function Overlay() {
                 {points.length > 0 && (
                   <ul className="ov-points">
                     {points.map((p, i) => (
-                      <li key={i}>{p}</li>
+                      <li key={i}>
+                        <MarkdownInline text={p} />
+                      </li>
                     ))}
                   </ul>
                 )}

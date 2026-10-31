@@ -40,6 +40,8 @@ const LANGS = new Set(['ru', 'uk', 'en'])
  */
 export class AsrManager {
   private sidecar: WhisperSidecar | null = null
+  // One start at a time: settings and the installer both call ensure() at once, and two starts left an orphan server.
+  private starting: Promise<boolean> | null = null
   private queue: AsrJob[] = []
   private busy = false
   private restarts = 0
@@ -90,8 +92,18 @@ export class AsrManager {
     this.ev.status(this.st)
   }
 
-  async ensure(): Promise<boolean> {
-    if (this.sidecar?.running) return true
+  ensure(): Promise<boolean> {
+    if (this.sidecar?.running) return Promise.resolve(true)
+    if (!this.starting) {
+      const p: Promise<boolean> = this.startSidecar().finally(() => {
+        if (this.starting === p) this.starting = null
+      })
+      this.starting = p
+    }
+    return this.starting
+  }
+
+  private async startSidecar(): Promise<boolean> {
     const server = this.assets.serverPath(this.cfg.backend)
     if (!server || !this.assets.hasModel(this.cfg.model)) {
       this.st = {
@@ -105,7 +117,8 @@ export class AsrManager {
       this.refreshStatus()
       return false
     }
-    this.sidecar = new WhisperSidecar(
+    // I keep a local handle: by the time an await returns, this.sidecar may already belong to a newer start or be null.
+    const sc: WhisperSidecar = new WhisperSidecar(
       {
         serverPath: server,
         modelPath: this.assets.modelPath(this.cfg.model),
@@ -114,7 +127,8 @@ export class AsrManager {
           if (/error|fail|cuda|gpu/i.test(line)) this.ev.log('asr_log', line)
         },
         onExit: (code) => {
-          const output = this.sidecar?.recentOutput ?? []
+          if (this.sidecar !== sc) return // an old server that was replaced or stopped on purpose
+          const output = sc.recentOutput
           const hint = diagnoseWhisperFailure(code, output)
           this.ev.log('asr_exit', { code, hint, output: output.slice(-6) })
           this.sidecar = null
@@ -125,14 +139,22 @@ export class AsrManager {
       },
       this.fetch
     )
+    this.sidecar = sc
     try {
-      await this.sidecar.start()
+      await sc.start()
+      if (this.sidecar !== sc) {
+        // stop() or a model switch happened while it was starting: this server is no longer wanted
+        sc.stop()
+        return false
+      }
       this.st = { ...this.st, error: null }
       this.refreshStatus()
       // GPU builds pay 13–27 s on the first request (spike S2), so I warm it up before the user speaks.
-      void this.sidecar.transcribe(new Int16Array(16000), 'en', '').catch(() => {})
+      void sc.transcribe(new Int16Array(16000), 'en', '').catch(() => {})
       return true
     } catch (e) {
+      sc.stop()
+      if (this.sidecar !== sc) return false
       const message = e instanceof Error ? e.message : String(e)
       this.ev.log('asr_start_fail', { backend: this.cfg.backend, model: this.cfg.model, message })
       this.sidecar = null
@@ -145,6 +167,8 @@ export class AsrManager {
   stop(): void {
     this.sidecar?.stop()
     this.sidecar = null
+    // a start still in flight sees it was superseded and stops its server; the next ensure() starts afresh
+    this.starting = null
     this.queue = []
     this.refreshStatus()
   }
@@ -181,9 +205,15 @@ export class AsrManager {
           }
         }
         const lang = this.cfg.language
+        // The model may have been switched during the speech check above; then I wait for the new server.
+        const sc = this.sidecar?.running ? this.sidecar : (await this.ensure()) ? this.sidecar : null
+        if (!sc) {
+          if (job.final) this.emit(job, '', null)
+          continue
+        }
         try {
           // No vocabulary in the prompt: whisper.cpp echoes the prompt on noise (phantom "Docker"/"Kubernetes").
-          const r = await this.sidecar!.transcribe(job.pcm, lang, '')
+          const r = await sc.transcribe(job.pcm, lang, '')
           this.st = { ...this.st, lastLatencyMs: r.ms }
           if (job.final) {
             this.ev.status(this.st)

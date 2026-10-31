@@ -308,6 +308,20 @@ body {
   font-weight: 500;
   margin-bottom: 8px;
 }
+/* the model marks key terms with **bold**; on a see-through panel weight alone is too subtle */
+.ov-say strong,
+.ov-points strong,
+.ov-deep strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+.ov-say code,
+.ov-points code {
+  font: 0.9em var(--mono);
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--panel-2);
+}
 .ov-say .md {
   font-size: 0.84em;
   font-weight: 400;

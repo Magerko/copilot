@@ -80,7 +80,10 @@ export const CORE: Dict = {
   'выключен — не распознаётся': ['вимкнено — не розпізнається', 'off — not transcribed'],
   'Вопрос из разговора': ['Питання з розмови', 'Question from the call'],
   'Решить самостоятельно': ['Вирішити самостійно', 'Solve on its own'],
-  'Своё задание: что сделать со снимком…': ['Своє завдання: що зробити зі знімком…', 'Your task: what to do with the capture…'],
+  'Своё задание… Enter без текста — решить самостоятельно': [
+    'Своє завдання… Enter без тексту — вирішити самостійно',
+    'Your task… Enter with no text solves it on its own'
+  ],
   'Найдёт вопрос в последних 2 минутах разговора и ответит на него вместе со снимком': [
     'Знайде питання в останніх 2 хвилинах розмови і відповість на нього разом зі знімком',
     'Finds the question in the last 2 minutes of the call and answers it with the capture'

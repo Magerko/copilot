@@ -116,20 +116,24 @@ export function Picker() {
             style={{ marginTop: 8 }}
             onSubmit={(e) => {
               e.preventDefault()
-              void submit('custom')
+              // Enter on an empty field means «solve it yourself» — the quickest path when there is nothing to add.
+              if (!busy) void submit(instruction.trim() ? 'custom' : 'solve')
             }}
           >
             <input
               className="input grow"
               style={{ height: 30 }}
               autoFocus
-              placeholder={t('Своё задание: что сделать со снимком…')}
+              placeholder={t('Своё задание… Enter без текста — решить самостоятельно')}
               value={instruction}
               onChange={(e) => setInstruction(e.target.value)}
             />
-            <button className="btn primary sm" type="submit" disabled={busy || !instruction.trim()}>
-              {t('Отправить')}
-            </button>
+            {/* Shown only with text: the top row already has «solve it yourself», and Enter on an empty field still does that. */}
+            {instruction.trim() && (
+              <button className="btn primary sm" type="submit" disabled={busy}>
+                {t('Отправить')}
+              </button>
+            )}
           </form>
           <div className="row wrap" style={{ marginTop: 8 }}>
             <button className="btn sm" disabled={busy} onClick={() => void submit('explain')}>

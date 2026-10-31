@@ -224,9 +224,9 @@ export const SETTINGS: Dict = {
     'Metal on Apple Silicon — a fraction of a second per phrase.'
   ],
   'Лучше на акцентах, всё ещё быстро на M-серии.': ['Краще з акцентами, усе ще швидко на M-серії.', 'Better with accents, still fast on M-series.'],
-  'Large v3 Turbo — лучшая точность. Первый запуск прогревается.': [
-    'Large v3 Turbo — найкраща точність. Перший запуск прогрівається.',
-    'Large v3 Turbo — the best accuracy. The first run warms up.'
+  'Large v3 Turbo — лучшая точность. После запуска движка — несколько секунд на прогрев.': [
+    'Large v3 Turbo — найкраща точність. Після запуску рушія — кілька секунд на прогрів.',
+    'Large v3 Turbo — best accuracy. A few seconds of warm-up after the engine starts.'
   ],
   '≈150 МБ': ['≈150 МБ', '≈150 MB'],
   '≈160 МБ': ['≈160 МБ', '≈160 MB'],
