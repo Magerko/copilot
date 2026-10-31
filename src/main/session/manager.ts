@@ -61,6 +61,7 @@ const OFF: ComponentStatus = { state: 'off', label: 'выкл.' }
 export function emptySnapshot(): AppSnapshot {
   return {
     sessionId: null,
+    startedAt: null,
     state: 'idle',
     listening: false,
     activeQuestion: null,
@@ -116,6 +117,7 @@ export class SessionManager {
     }
     Object.assign(this.snap, {
       sessionId: id,
+      startedAt: this.startedAt,
       state: 'listening',
       listening: true,
       activeQuestion: null,
@@ -151,7 +153,7 @@ export class SessionManager {
     if (!this.snap.sessionId) return
     this.cancelAll()
     if (this.persist) this.d.db.endSession(this.snap.sessionId)
-    Object.assign(this.snap, { sessionId: null, state: 'stopped', listening: false, partial: {}, candidates: [] })
+    Object.assign(this.snap, { sessionId: null, startedAt: null, state: 'stopped', listening: false, partial: {}, candidates: [] })
     // Capture statuses come from the renderer only while it captures; after stop nothing else would reset them, so I do it here.
     this.snap.status.mic = OFF
     this.snap.status.system = OFF

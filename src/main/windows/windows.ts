@@ -48,28 +48,29 @@ export function displayProtectionSupported(platform: NodeJS.Platform = process.p
   return build >= 19041
 }
 
-export function defaultOverlayBounds(): Rectangle {
+export function defaultOverlayBounds(size: OverlaySettings['size'] = { width: 640, height: 440 }): Rectangle {
   const wa = screen.getPrimaryDisplay().workArea
-  const width = 460
-  const height = 220
+  const width = Math.min(size.width, wa.width - 48)
+  const height = Math.min(220, size.height)
   return { x: wa.x + wa.width - width - 24, y: wa.y + 24, width, height }
 }
 
 /** I restore saved bounds only if they are still visible on some connected display. */
-export function sanitizeBounds(b: OverlaySettings['bounds']): Rectangle {
-  if (!b) return defaultOverlayBounds()
+export function sanitizeBounds(b: OverlaySettings['bounds'], size?: OverlaySettings['size']): Rectangle {
+  if (!b) return defaultOverlayBounds(size)
   const visible = screen.getAllDisplays().some((d) => {
     const wa = d.workArea
     return b.x + 60 > wa.x && b.x < wa.x + wa.width - 60 && b.y >= wa.y - 10 && b.y < wa.y + wa.height - 40
   })
-  return visible ? b : defaultOverlayBounds()
+  return visible ? b : defaultOverlayBounds(size)
 }
 
 export function createOverlay(o: OverlaySettings): BrowserWindow {
-  const bounds = sanitizeBounds(o.bounds)
+  const bounds = { ...sanitizeBounds(o.bounds, o.size), width: o.size.width }
+  if (o.expanded) bounds.height = o.size.height
   const win = new BrowserWindow({
     ...bounds,
-    minWidth: 300,
+    minWidth: 360,
     minHeight: 120,
     show: false,
     frame: false,

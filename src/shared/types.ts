@@ -179,6 +179,8 @@ export type ShortcutAction = 'toggleOverlay' | 'toggleListen' | 'answerNow' | 's
 export interface OverlaySettings {
   bounds: { x: number; y: number; width: number; height: number } | null
   displayId: number | null
+  /** Width, and the height cap: compact mode grows with the answer up to it, expanded mode uses it as is. */
+  size: { width: number; height: number }
   opacity: number
   fontScale: number
   expanded: boolean
@@ -258,6 +260,7 @@ export interface SessionCost {
 
 export interface AppSnapshot {
   sessionId: string | null
+  startedAt: number | null
   state: ConvState
   listening: boolean
   activeQuestion: ActiveQuestion | null

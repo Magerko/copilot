@@ -78,6 +78,31 @@ function OverlayTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
             />
           </label>
           <label className="field">
+            <span>Ширина окна: {o.size.width} px</span>
+            <input
+              type="range"
+              min={360}
+              max={1400}
+              step={10}
+              value={o.size.width}
+              onChange={(e) => void ctx.patch({ overlay: { size: { width: Number(e.target.value), height: o.size.height } } })}
+            />
+          </label>
+          <label className="field">
+            <span>Высота окна: {o.size.height} px</span>
+            <input
+              type="range"
+              min={160}
+              max={1000}
+              step={10}
+              value={o.size.height}
+              onChange={(e) => void ctx.patch({ overlay: { size: { width: o.size.width, height: Number(e.target.value) } } })}
+            />
+            <span className="small faint">
+              В компактном режиме окно растёт под ответ до этой высоты, в развёрнутом — занимает её целиком. Можно и просто потянуть за край окна.
+            </span>
+          </label>
+          <label className="field">
             <span>Тема</span>
             <select className="input" value={o.theme} onChange={(e) => void ctx.patch({ overlay: { theme: e.target.value as 'dark' | 'light' } })}>
               <option value="dark">Тёмная</option>

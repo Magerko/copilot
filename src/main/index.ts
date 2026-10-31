@@ -170,7 +170,8 @@ function applySettings(prev: Settings | null): void {
     const o = st.overlay
     overlay.setAlwaysOnTop(o.pinned, 'screen-saver')
     if (prev.overlay.protect !== o.protect) applyProtection()
-    if (prev.overlay.theme !== o.theme) overlay.setBackgroundColor(o.theme === 'dark' ? '#14161b' : '#f7f7f5')
+    // The window stays transparent in both themes; the panel CSS draws the (semi-transparent) background.
+    if (JSON.stringify(prev.overlay.size) !== JSON.stringify(o.size)) applyOverlaySize()
   }
   if (!prev || prev.window.protectFromCapture !== st.window.protectFromCapture) applyWindowProtection()
   updateLlmStatus()
@@ -195,6 +196,14 @@ function applyProtection(): void {
   )
 }
 
+/** Width always follows the setting; height only in expanded mode, compact mode re-fits to the content up to the cap. */
+function applyOverlaySize(): void {
+  if (!overlay || overlay.isDestroyed()) return
+  const { size, expanded } = s().overlay
+  const b = overlay.getBounds()
+  overlay.setBounds({ ...b, width: size.width, height: expanded ? size.height : Math.min(b.height, size.height) })
+}
+
 function ensureOverlay(): BrowserWindow {
   if (overlay && !overlay.isDestroyed()) return overlay
   overlay = createOverlay(s().overlay)
@@ -208,7 +217,15 @@ function ensureOverlay(): BrowserWindow {
     }, 400)
   }
   overlay.on('moved', save)
-  overlay.on('resized', save)
+  overlay.on('resized', () => {
+    save()
+    // A manual resize is the user choosing a size: I keep the width, and the height too when it is not auto-fitted.
+    if (!overlay || overlay.isDestroyed()) return
+    const b = overlay.getBounds()
+    const o = s().overlay
+    settings.patch({ overlay: { size: { width: b.width, height: o.expanded ? b.height : o.size.height } } })
+    broadcast('km:settings', s())
+  })
   overlay.on('closed', () => {
     overlay = null
     sessionMgr.setStatus('overlay', { state: 'off', label: 'скрыт' })
@@ -223,7 +240,7 @@ function ensureOverlay(): BrowserWindow {
 
 function showOverlay(): void {
   const w = ensureOverlay()
-  w.setBounds(sanitizeBounds(w.getBounds()))
+  w.setBounds(sanitizeBounds(w.getBounds(), s().overlay.size))
   // I show it inactive so the foreground window (IDE, Zoom) keeps keyboard focus (spike S1).
   w.showInactive()
   sessionMgr.setStatus('overlay', { state: 'ok', label: s().overlay.expanded ? 'развёрнут' : 'компактный' })
@@ -639,13 +656,14 @@ function registerIpc(): void {
   handle('km:overlay:toggle', () => toggleOverlay())
   handle('km:overlay:expand', (v: boolean) => {
     settings.patch({ overlay: { expanded: v } })
+    if (v) applyOverlaySize()
     broadcast('km:settings', s())
     if (v && !sessionMgr.snap.answers.deep && sessionMgr.snap.activeQuestion) sessionMgr.answerNow('deep', 'manual')
   })
   handle('km:overlay:fit', (h: number) => {
     if (!overlay) return
     const b = overlay.getBounds()
-    overlay.setBounds({ ...b, height: Math.max(120, Math.min(900, Math.round(h))) })
+    overlay.setBounds({ ...b, height: Math.max(120, Math.min(s().overlay.size.height, Math.round(h))) })
   })
   handle('km:copy', (text: string) => {
     clipboard.writeText(text)

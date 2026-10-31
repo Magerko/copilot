@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS: Settings = {
   overlay: {
     bounds: null,
     displayId: null,
+    size: { width: 640, height: 440 },
     opacity: 0.94,
     fontScale: 1,
     expanded: false,
