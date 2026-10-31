@@ -32,7 +32,7 @@ jobs:
           ver="${GITHUB_REF_NAME#v}"
           notes="Локальный AI-копилот для интервью и встреч (Windows). Распознавание речи на вашем ПК, ответы на вашей модели (BYOK).
 
-          **Установка:** скачайте \`Kairos M Setup ${ver}.exe\` и запустите.
+          **Установка:** скачайте \`Copilot Setup ${ver}.exe\` и запустите.
 
           > Установщик **не подписан** сертификатом, поэтому Windows SmartScreen покажет «Неизвестный издатель».
           > Это ожидаемо для открытого проекта без платного сертификата: «Подробнее» → «Выполнить в любом случае».
@@ -40,12 +40,12 @@ jobs:
 
           **Что внутри:** раздельный захват микрофона и звука собеседника, локальная ASR (whisper.cpp), оверлей без кражи фокуса и с защитой от захвата экрана, контекст из CV/JD без выдумывания фактов, офлайн-режим, история в SQLite. Приложение не обходит прокторинг и не обещает невидимости.
 
-          **SHA-256** \`Kairos M Setup ${ver}.exe\`:
+          **SHA-256** \`Copilot Setup ${ver}.exe\`:
           \`${sha}\`"
           files=(release/*.exe release/*.blockmap)
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release edit "$GITHUB_REF_NAME" --title "Kairos M ${GITHUB_REF_NAME}" --notes "$notes"
+            gh release edit "$GITHUB_REF_NAME" --title "Copilot ${GITHUB_REF_NAME}" --notes "$notes"
             gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" --title "Kairos M ${GITHUB_REF_NAME}" --notes "$notes" "${files[@]}"
+            gh release create "$GITHUB_REF_NAME" --title "Copilot ${GITHUB_REF_NAME}" --notes "$notes" "${files[@]}"
           fi
