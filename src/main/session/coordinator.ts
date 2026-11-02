@@ -37,6 +37,8 @@ export const DEFAULT_COORDINATOR: CoordinatorOptions = {
 
 interface Tracked extends Utterance {
   consumed: boolean
+  /** Own speech already turned into a question by an explicit «answer» press. */
+  manualUsed?: boolean
 }
 
 export class QuestionCoordinator {
@@ -144,6 +146,21 @@ export class QuestionCoordinator {
       const text = span.map((r) => r.text).join(' ')
       const kind = classify(text).kind
       return this.open(text, { source: 'remote', text, startMs: span[0].startMs, endMs: lastEnd }, kind === 'statement' ? 'question' : kind, trigger)
+    }
+    // An explicit «answer» with nothing new from the other side: the user likely said the question themselves (a test,
+    // or the other person is not captured). I take their last phrase — but if a question is already open, only when the
+    // phrase sounds like a question, so pressing «answer» right after answering out loud re-answers instead.
+    const mine = this.recent.filter((r) => r.source === 'user' && !r.manualUsed && (!this.activeQ || r.startMs > this.activeQ.endMs))
+    if (mine.length) {
+      const lastEnd = mine[mine.length - 1].endMs
+      const span = mine.filter((r) => lastEnd - r.startMs <= 15_000).slice(-2)
+      const text = span.map((r) => r.text).join(' ')
+      const kind = classify(text).kind
+      const asks = kind !== 'statement' && kind !== 'small_talk'
+      if (asks || !this.activeQ) {
+        for (const r of span) r.manualUsed = true
+        return this.open(text, { source: 'user', text, startMs: span[0].startMs, endMs: lastEnd }, asks ? kind : 'question', trigger)
+      }
     }
     if (this.activeQ) return { type: 'reanswer', question: this.activeQ }
     return { type: 'ignore', reason: 'nothing_to_answer' }

@@ -1,4 +1,5 @@
 import type { ProviderPreset, ProviderProtocol } from '@shared/types'
+import { t } from '@shared/i18n'
 
 export interface PresetInfo {
   label: string
@@ -63,4 +64,11 @@ export const PRESETS: Record<ProviderPreset, PresetInfo> = {
     needsKey: false,
     note: 'vLLM, LiteLLM и любой совместимый сервер. Проверьте, кому уходят данные.'
   }
+}
+
+/** Labels and notes are Russian source text; I translate them when the UI asks, so they follow the current language. */
+export function presetsForUi(): Record<ProviderPreset, PresetInfo> {
+  const out = {} as Record<ProviderPreset, PresetInfo>
+  for (const [k, p] of Object.entries(PRESETS) as [ProviderPreset, PresetInfo][]) out[k] = { ...p, label: t(p.label), note: t(p.note) }
+  return out
 }

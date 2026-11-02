@@ -91,6 +91,21 @@ describe('QuestionCoordinator', () => {
     expect(m.type).toBe('new')
   })
 
+  it('answer-now takes the user’s own last phrase when nothing new came from the other side', () => {
+    const c = coord(false)
+    c.onUtterance({ source: 'user', text: 'які бувають види тестування.', startMs: 0, endMs: 1500 })
+    const m = c.manual('hotkey')
+    expect(m.type).toBe('new')
+    if (m.type === 'new') expect(m.question.text).toBe('які бувають види тестування.')
+  })
+
+  it('answer-now right after answering out loud re-answers instead of treating the answer as a question', () => {
+    const c = coord(false)
+    c.onUtterance({ source: 'remote', text: 'What is a mutex?', startMs: 0, endMs: 1500 })
+    c.onUtterance({ source: 'user', text: 'It is a lock that lets one thread in at a time.', startMs: 3000, endMs: 6000 })
+    expect(c.manual('hotkey').type).toBe('reanswer')
+  })
+
   it('answer-now with nothing heard reports it instead of inventing a question', () => {
     expect(coord().manual('hotkey').type).toBe('ignore')
   })

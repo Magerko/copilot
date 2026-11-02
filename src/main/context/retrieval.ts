@@ -102,3 +102,40 @@ export class Bm25Index {
       .slice(0, k)
   }
 }
+
+// Questions about the user themselves: the answer has to come from the CV even when no word matches it.
+const ABOUT_ME =
+  /резюме|\bcv\b|resume|досвід|опыт|о себе|про себе|yourself|experience|карьер|кар[’'`]?єр|навич|навык|skills|проект|проєкт|project|работал|працював|worked/iu
+// Sections that describe the person as a whole; they go into every prompt.
+const CORE_SECTION = /summary|profile|about|objective|skills|резюме|о себе|про себе|обо мне|про мене|навички|навыки|ключев|ключов/iu
+
+/**
+ * Picks the document context for one question. Lexical search misses when the CV and the question are in different
+ * languages (an English CV, a Ukrainian interview), so besides the matches I always add the profile core: each CV's
+ * header, summary and skills, and the start of each job description. For questions about the user, or when nothing
+ * matched, the rest of the CV follows in document order. The prompt builder trims the tail to its budget, so the order
+ * here is the priority: matches first, then the core, then the rest.
+ */
+export function selectKnowledge(index: Bm25Index | null, chunks: Chunk[], question: string, k = 8): Chunk[] {
+  const out: Chunk[] = []
+  const seen = new Set<string>()
+  const add = (c: Chunk) => {
+    if (seen.has(c.id)) return
+    seen.add(c.id)
+    out.push(c)
+  }
+  const found = index ? index.search(question, k).map((r) => r.chunk) : []
+  found.forEach(add)
+
+  const byDoc = new Map<string, Chunk[]>()
+  for (const c of chunks) byDoc.set(c.documentId, [...(byDoc.get(c.documentId) ?? []), c])
+  for (const doc of byDoc.values()) {
+    if (doc[0].kind === 'cv') {
+      add(doc[0])
+      doc.filter((c) => CORE_SECTION.test(c.section)).forEach(add)
+    } else if (doc[0].kind === 'jd') doc.slice(0, 2).forEach(add)
+  }
+
+  if (ABOUT_ME.test(question) || !found.length) chunks.filter((c) => c.kind === 'cv').forEach(add)
+  return out
+}

@@ -2,6 +2,7 @@ import { BrowserWindow, screen, type Rectangle } from 'electron'
 import { join } from 'node:path'
 import { release } from 'node:os'
 import type { OverlaySettings } from '@shared/types'
+import { t } from '@shared/i18n'
 
 const preload = join(__dirname, '../preload/index.js')
 
@@ -37,35 +38,40 @@ export function createDashboard(): BrowserWindow {
   return win
 }
 
-/** WDA_EXCLUDEFROMCAPTURE exists since Windows 10 2004 (build 19041). */
-export function displayProtectionSupported(): boolean {
-  if (process.platform !== 'win32') return false
-  const build = Number(release().split('.')[2] ?? 0)
+/**
+ * WDA_EXCLUDEFROMCAPTURE exists since Windows 10 2004 (build 19041). On macOS Electron sets NSWindowSharingNone,
+ * which every supported version accepts, though ScreenCaptureKit-based tools may still capture the window.
+ */
+export function displayProtectionSupported(platform: NodeJS.Platform = process.platform, osRelease = release()): boolean {
+  if (platform === 'darwin') return true
+  if (platform !== 'win32') return false
+  const build = Number(osRelease.split('.')[2] ?? 0)
   return build >= 19041
 }
 
-export function defaultOverlayBounds(): Rectangle {
+export function defaultOverlayBounds(size: OverlaySettings['size'] = { width: 640, height: 440 }): Rectangle {
   const wa = screen.getPrimaryDisplay().workArea
-  const width = 460
-  const height = 220
+  const width = Math.min(size.width, wa.width - 48)
+  const height = Math.min(220, size.height)
   return { x: wa.x + wa.width - width - 24, y: wa.y + 24, width, height }
 }
 
 /** I restore saved bounds only if they are still visible on some connected display. */
-export function sanitizeBounds(b: OverlaySettings['bounds']): Rectangle {
-  if (!b) return defaultOverlayBounds()
+export function sanitizeBounds(b: OverlaySettings['bounds'], size?: OverlaySettings['size']): Rectangle {
+  if (!b) return defaultOverlayBounds(size)
   const visible = screen.getAllDisplays().some((d) => {
     const wa = d.workArea
     return b.x + 60 > wa.x && b.x < wa.x + wa.width - 60 && b.y >= wa.y - 10 && b.y < wa.y + wa.height - 40
   })
-  return visible ? b : defaultOverlayBounds()
+  return visible ? b : defaultOverlayBounds(size)
 }
 
 export function createOverlay(o: OverlaySettings): BrowserWindow {
-  const bounds = sanitizeBounds(o.bounds)
+  const bounds = { ...sanitizeBounds(o.bounds, o.size), width: o.size.width }
+  if (o.expanded) bounds.height = o.size.height
   const win = new BrowserWindow({
     ...bounds,
-    minWidth: 300,
+    minWidth: 360,
     minHeight: 120,
     show: false,
     frame: false,
@@ -82,7 +88,7 @@ export function createOverlay(o: OverlaySettings): BrowserWindow {
     // I make it transparent so the panel background can be semi-see-through while the text stays fully opaque (CSS controls the alpha).
     transparent: true,
     backgroundColor: '#00000000',
-    title: 'Copilot — подсказки',
+    title: t('Copilot — подсказки'),
     webPreferences: { ...webPreferences, backgroundThrottling: false }
   })
   if (o.pinned) win.setAlwaysOnTop(true, 'screen-saver')

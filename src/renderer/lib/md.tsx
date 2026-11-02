@@ -44,7 +44,14 @@ export function Markdown({ text }: { text: string }) {
   return <div className="md">{blocks}</div>
 }
 
+/** Inline-only markdown (bold, code) for one-line answers and bullets that must not become blocks. */
+export function MarkdownInline({ text }: { text: string }) {
+  return <>{inline(text)}</>
+}
+
 function inline(s: string): ReactNode {
+  // While an answer streams, a «**» can arrive before its pair; I hide the dangling one instead of flashing raw asterisks.
+  if ((s.match(/\*\*/g)?.length ?? 0) % 2) s = s.replace(/\*\*(?!.*\*\*)/s, '')
   const parts = s.split(/(`[^`]+`|\*\*[^*]+\*\*)/g)
   return parts.map((p, i) =>
     p.startsWith('`') && p.endsWith('`') && p.length > 1 ? (

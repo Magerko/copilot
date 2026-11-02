@@ -1,4 +1,5 @@
 import type { AppError } from '@shared/types'
+import { t } from '@shared/i18n'
 
 export class ProviderError extends Error {
   constructor(readonly appError: AppError) {
@@ -27,12 +28,12 @@ export function checkEndpoint(raw: string): UrlCheck {
   try {
     u = new URL(raw)
   } catch {
-    return { ok: false, error: 'Некорректный адрес' }
+    return { ok: false, error: t('Некорректный адрес') }
   }
-  if (u.protocol !== 'https:' && u.protocol !== 'http:') return { ok: false, error: `Схема ${u.protocol} запрещена` }
-  if (u.username || u.password) return { ok: false, error: 'Логин и пароль в адресе запрещены — используйте поле ключа' }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return { ok: false, error: t('Схема {scheme} запрещена', { scheme: u.protocol }) }
+  if (u.username || u.password) return { ok: false, error: t('Логин и пароль в адресе запрещены — используйте поле ключа') }
   if (u.protocol === 'http:' && !isLoopbackUrl(raw)) {
-    return { ok: true, warning: 'Незащищённый HTTP вне localhost: ключ и данные идут открытым текстом' }
+    return { ok: true, warning: t('Незащищённый HTTP вне localhost: ключ и данные идут открытым текстом') }
   }
   return { ok: true }
 }
@@ -85,7 +86,7 @@ export class NetGuard {
     for (const l of this.listeners) l(safeUrl, reason)
     throw new ProviderError({
       code,
-      message: code === 'offline_blocked' ? 'Заблокировано офлайн-режимом' : 'Адрес запрещён политикой приложения',
+      message: code === 'offline_blocked' ? t('Заблокировано офлайн-режимом') : t('Адрес запрещён политикой приложения'),
       detail: safeUrl
     })
   }

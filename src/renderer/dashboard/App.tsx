@@ -38,9 +38,10 @@ export function App() {
     })
   }, [setSettings])
 
+  // t() is not reactive: I set the language during render, before any child builds its labels, so a switch applies at once.
+  if (settings) setLang(settings.uiLang)
   useEffect(() => {
     if (!settings) return
-    setLang(settings.uiLang)
     document.documentElement.dataset.theme = settings.overlay.theme === 'light' ? 'light' : 'dark'
   }, [settings])
 
@@ -63,6 +64,16 @@ export function App() {
       }),
     []
   )
+
+  // The overlay's mic / system-audio buttons flip these settings; I apply them to the running capture at once.
+  const wantMic = !!settings && settings.audio.captureMic && settings.consent.mic
+  const wantSystem = !!settings && settings.audio.captureSystem && settings.consent.system
+  useEffect(() => {
+    void capture.current.setSource('user', wantMic)
+  }, [wantMic])
+  useEffect(() => {
+    void capture.current.setSource('remote', wantSystem)
+  }, [wantSystem])
 
   if (!init || !settings || !snap) return <div className="boot">Copilot…</div>
 
@@ -110,7 +121,7 @@ export function App() {
             </button>
           )}
           <div className="faint small">
-            v{init.version} · {settings.offline ? 'офлайн' : 'BYOK'}
+            v{init.version} · {settings.offline ? t('офлайн') : 'BYOK'}
           </div>
         </div>
       </aside>

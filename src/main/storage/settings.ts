@@ -7,12 +7,23 @@ export const DEFAULT_SETTINGS: Settings = {
   answerLang: 'auto',
   offline: false,
   autoAnswer: false,
-  asr: { backend: 'cpu', model: 'base', language: 'ru', vocabulary: ['PostgreSQL', 'FastAPI', 'Kubernetes', 'Docker', 'React', 'TypeScript'], threads: 6 },
+  answerInstructions: '',
+  answerFormat: 'text',
+  sessionMode: 'practice',
+  asr: {
+    backend: 'cpu',
+    model: 'base',
+    language: 'ru',
+    vocabulary: ['PostgreSQL', 'FastAPI', 'Kubernetes', 'Docker', 'React', 'TypeScript'],
+    vocabPrompt: true,
+    threads: 6
+  },
   audio: { micDeviceId: null, captureMic: true, captureSystem: true },
   contextWindowMin: 3,
   overlay: {
     bounds: null,
     displayId: null,
+    size: { width: 640, height: 440 },
     opacity: 0.94,
     fontScale: 1,
     expanded: false,
@@ -28,6 +39,7 @@ export const DEFAULT_SETTINGS: Settings = {
     scrollUp: 'Control+Alt+Up',
     scrollDown: 'Control+Alt+Down',
     expand: 'Control+Alt+E',
+    askTyped: 'Control+Alt+Q',
     panic: 'Control+Alt+Backspace'
   },
   history: true,
@@ -36,7 +48,7 @@ export const DEFAULT_SETTINGS: Settings = {
   roles: {},
   activeProfileId: 'default',
   consent: { mic: false, system: false, screen: false, cloud: false, history: false, participants: false, acceptedAt: null },
-  window: { minimizeToTray: true, protectFromCapture: true, panicQuits: false }
+  window: { minimizeToTray: true, protectFromCapture: true, panicQuits: false, hideFromDock: true }
 }
 
 export function deepMerge<T>(base: T, patch: DeepPartial<T> | undefined): T {

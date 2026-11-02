@@ -97,6 +97,37 @@ export function appIcon(size: number): Buffer {
   })
 }
 
+/**
+ * macOS menu bar mark: the same double chevron with no tile, black on transparent. Marked as a template image, macOS
+ * tints it like the neighbouring icons — white on a dark menu bar, black on a light one.
+ */
+export function trayTemplateIcon(size: number): Buffer {
+  const s = size
+  const stroke = s * 0.15
+  const at = (rows: number[][]): [number, number][] => rows.map(([x, y]) => [x * s, y * s])
+  const chevrons = [
+    at([
+      [0.16, 0.5],
+      [0.5, 0.2],
+      [0.84, 0.5]
+    ]),
+    at([
+      [0.16, 0.8],
+      [0.5, 0.5],
+      [0.84, 0.8]
+    ])
+  ]
+  return makePng(s, s, (x, y) => {
+    // I sample the pixel centre so the 1x and 2x images line up.
+    const px = x + 0.5
+    const py = y + 0.5
+    let d = Infinity
+    for (const pts of chevrons) for (let i = 0; i < pts.length - 1; i++) d = Math.min(d, segDist(px, py, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]))
+    const a = Math.max(0, Math.min(1, stroke / 2 + 0.5 - d))
+    return [0, 0, 0, Math.round(a * 255)]
+  })
+}
+
 export function solidPng(size: number, rgb: [number, number, number]): Buffer {
   return makePng(size, size, () => [rgb[0], rgb[1], rgb[2], 255])
 }

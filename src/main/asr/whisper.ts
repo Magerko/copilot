@@ -3,6 +3,7 @@ import { createServer } from 'node:net'
 import { dirname } from 'node:path'
 import type { Lang } from '@shared/types'
 import type { FetchFn } from '../providers/adapter'
+import { t } from '@shared/i18n'
 
 export interface WhisperResult {
   text: string
@@ -59,10 +60,9 @@ function lev(a: string, b: string): number {
   return d[n]
 }
 
-// The vocabulary used to go into whisper's prompt, but whisper.cpp regurgitates the prompt on noise —
-// that is where phantom "Docker"/"Kubernetes" came from. Instead I fix the spelling/casing of a known
-// term the model ALREADY produced; a fuzzy match can only rewrite a word that was recognized, never
-// insert one that was not spoken. Short terms match on casing only, to avoid "reacts" → "React".
+// Spelling fix-up: I correct the spelling/casing of a known term the model ALREADY produced; a fuzzy match can
+// only rewrite a word that was recognized, never insert one that was not spoken. Short terms match on casing
+// only, to avoid "reacts" → "React".
 export function applyVocabulary(text: string, vocab: string[]): string {
   const terms = vocab.map((t) => ({ canon: t, key: norm(t) })).filter((t) => t.key.length >= 3)
   if (!terms.length) return text
@@ -78,6 +78,30 @@ export function applyVocabulary(text: string, vocab: string[]): string {
     }
     return word
   })
+}
+
+const GLOSSARY = 'Glossary:'
+
+/**
+ * The terms as whisper's prompt, so «SDLC» comes out in Latin letters instead of «СДЛС». whisper.cpp echoes its
+ * prompt on silence and noise; the Silero gate now drops those clips first, and isPromptEcho() catches the rest.
+ */
+export function vocabularyPrompt(vocab: string[]): string {
+  let out = ''
+  for (const term of vocab.map((t) => t.trim()).filter(Boolean)) {
+    const next = out ? `${out}, ${term}` : term
+    if (next.length > 300) break // whisper keeps only the last ~224 tokens of a prompt
+    out = next
+  }
+  return out ? `${GLOSSARY} ${out}.` : ''
+}
+
+/** True when the «transcript» is the prompt coming back: only glossary words, or the glossary label itself. */
+export function isPromptEcho(text: string, vocab: string[]): boolean {
+  if (text.toLowerCase().includes(GLOSSARY.toLowerCase())) return true
+  const terms = new Set(vocab.flatMap((t) => t.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []))
+  const words = text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []
+  return words.length > 0 && terms.size > 0 && words.every((w) => terms.has(w))
 }
 
 export function encodeWav(pcm: Int16Array, sampleRate = 16000): Buffer {
@@ -125,17 +149,17 @@ export function diagnoseWhisperFailure(exitCode: number | null, lines: string[])
   const text = lines.join('\n').toLowerCase()
   const u = (exitCode ?? 0) >>> 0
   if (/msvcp140|vcruntime140|vcomp140|the code execution cannot proceed|не удалось запустить/.test(text) || u === 0xc0000135)
-    return 'не хватает Microsoft Visual C++ Redistributable (x64) — установите его с сайта Microsoft и перезапустите'
+    return t('не хватает Microsoft Visual C++ Redistributable (x64) — установите его с сайта Microsoft и перезапустите')
   if (/illegal instruction|invalid opcode|unsupported instruction/.test(text) || u === 0xc000001d)
-    return 'процессор, похоже, без нужных инструкций (AVX) — на старом CPU whisper.cpp может не запускаться'
+    return t('процессор, похоже, без нужных инструкций (AVX) — на старом CPU whisper.cpp может не запускаться')
   if (/cuda|cublas|nvcuda|cudart|no cuda-capable|cublaslt/.test(text))
-    return 'ошибка CUDA/видеокарты — обновите драйвер NVIDIA или выберите CPU-движок в «Настройки → Распознавание»'
+    return t('ошибка CUDA/видеокарты — обновите драйвер NVIDIA или выберите CPU-движок в «Настройки → Распознавание»')
   if (/failed to load model|invalid model|unknown (model )?architecture|bad magic|wrong magic|ggml_|corrupt/.test(text))
-    return 'файл модели повреждён или несовместим — удалите и скачайте модель заново'
-  if (/address already in use|eaddrinuse|bind.*fail/.test(text)) return 'порт занят другим процессом — закройте лишние копии и попробуйте снова'
-  if (u === 0xc0000005) return 'аварийное завершение (access violation) — возможно, повреждён движок или модель; переустановите распознавание'
+    return t('файл модели повреждён или несовместим — удалите и скачайте модель заново')
+  if (/address already in use|eaddrinuse|bind.*fail/.test(text)) return t('порт занят другим процессом — закройте лишние копии и попробуйте снова')
+  if (u === 0xc0000005) return t('аварийное завершение (access violation) — возможно, повреждён движок или модель; переустановите распознавание')
   if (/access is denied|отказано в доступе|0x80070005/.test(text) || u === 0xc0000022)
-    return 'запуск заблокирован (антивирус или права доступа) — добавьте папку приложения в исключения'
+    return t('запуск заблокирован (антивирус или права доступа) — добавьте папку приложения в исключения')
   return null
 }
 
@@ -185,7 +209,7 @@ export class WhisperSidecar {
     })
     const deadline = Date.now() + 60_000
     while (Date.now() < deadline) {
-      if (!this.running) throw new Error(this.startupError('whisper-server завершился при запуске'))
+      if (!this.running) throw new Error(this.startupError(t('whisper-server завершился при запуске')))
       try {
         const r = await this.fetch(`http://127.0.0.1:${this.port}/`, { signal: AbortSignal.timeout(1000) })
         if (r.status < 500) return
@@ -194,13 +218,13 @@ export class WhisperSidecar {
       }
       await new Promise((r) => setTimeout(r, 200))
     }
-    throw new Error(this.startupError('whisper-server не ответил за 60 с'))
+    throw new Error(this.startupError(t('whisper-server не ответил за 60 с')))
   }
 
   private startupError(base: string): string {
     const hint = diagnoseWhisperFailure(this.exitCode, this.tail)
-    const code = this.exitCode != null ? ` (код ${this.exitCode})` : ''
-    const out = this.tail.length ? ` — вывод: ${this.tail.slice(-4).join(' | ')}` : ''
+    const code = this.exitCode != null ? ` (${t('код {code}', { code: this.exitCode })})` : ''
+    const out = this.tail.length ? ` — ${t('вывод: {lines}', { lines: this.tail.slice(-4).join(' | ') })}` : ''
     return `${base}${code}${hint ? `. ${hint}` : ''}${out}`
   }
 

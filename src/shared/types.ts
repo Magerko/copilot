@@ -46,7 +46,11 @@ export interface QuestionEvent {
 }
 
 export type AnswerKind = 'say' | 'points' | 'deep' | 'screen'
-export type ScreenTask = 'explain' | 'approach' | 'review'
+/**
+ * context — find the question in the last minutes of the conversation and answer it with the capture;
+ * custom — do what the user typed; solve — solve what the capture shows, without conversation or CV.
+ */
+export type ScreenTask = 'context' | 'custom' | 'solve' | 'explain' | 'approach' | 'review'
 export type AnswerStatus = 'streaming' | 'done' | 'cancelled' | 'error' | 'stale' | 'blocked'
 
 export interface Usage {
@@ -154,7 +158,7 @@ export interface ModelPrice {
   outputPerMTok: number
 }
 
-export type ProfilePreset = 'hr' | 'backend' | 'frontend' | 'devops' | 'system_design' | 'coding' | 'meeting'
+export type ProfilePreset = 'hr' | 'backend' | 'frontend' | 'devops' | 'qa' | 'system_design' | 'coding' | 'meeting'
 export type AnswerStyle = 'short' | 'natural' | 'academic' | 'english_b2'
 
 export interface Profile {
@@ -174,11 +178,13 @@ export interface KnowledgeDoc {
   createdAt: number
 }
 
-export type ShortcutAction = 'toggleOverlay' | 'toggleListen' | 'answerNow' | 'snapRegion' | 'scrollUp' | 'scrollDown' | 'expand' | 'panic'
+export type ShortcutAction = 'toggleOverlay' | 'toggleListen' | 'answerNow' | 'snapRegion' | 'scrollUp' | 'scrollDown' | 'expand' | 'askTyped' | 'panic'
 
 export interface OverlaySettings {
   bounds: { x: number; y: number; width: number; height: number } | null
   displayId: number | null
+  /** Width, and the height cap: compact mode grows with the answer up to it, expanded mode uses it as is. */
+  size: { width: number; height: number }
   opacity: number
   fontScale: number
   expanded: boolean
@@ -203,7 +209,13 @@ export interface Settings {
   answerLang: 'auto' | Lang
   offline: boolean
   autoAnswer: boolean
-  asr: { backend: 'cpu' | 'cuda'; model: string; language: 'auto' | Lang; vocabulary: string[]; threads: number }
+  /** The user's own instructions on how answers should sound; added to every answer prompt. */
+  answerInstructions: string
+  /** text — a ready sentence to say plus talking points; cues — 3–5 short cues to answer in your own words. */
+  answerFormat: 'text' | 'cues'
+  /** The session mode last chosen on Home; every other way to start a session (overlay, tray, hotkey) uses it too. */
+  sessionMode: SessionStartOptions['mode']
+  asr: { backend: 'cpu' | 'cuda'; model: string; language: 'auto' | Lang; vocabulary: string[]; vocabPrompt: boolean; threads: number }
   audio: { micDeviceId: string | null; captureMic: boolean; captureSystem: boolean }
   contextWindowMin: number
   overlay: OverlaySettings
@@ -224,6 +236,8 @@ export interface WindowSettings {
   protectFromCapture: boolean
   /** Emergency stop fully quits the app (process gone) instead of only stopping capture and hiding the overlay. */
   panicQuits: boolean
+  /** macOS: run as an accessory app — no Dock icon and not in ⌘Tab; the menu bar icon stays. */
+  hideFromDock: boolean
 }
 
 export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
@@ -256,14 +270,25 @@ export interface SessionCost {
   requests: number
 }
 
+/** An earlier question of this session with the answers it got, for paging back in the overlay. */
+export interface HistoryEntry {
+  questionId: string
+  text: string
+  answers: Partial<Record<AnswerKind, string>>
+}
+
 export interface AppSnapshot {
   sessionId: string | null
+  startedAt: number | null
+  mode: SessionStartOptions['mode'] | null
   state: ConvState
   listening: boolean
   activeQuestion: ActiveQuestion | null
   candidates: Candidate[]
   answers: Partial<Record<AnswerKind, AnswerEvent>>
-  recentQuestions: { questionId: string; text: string }[]
+  /** Earlier questions of this session, newest first, with the answers they got. */
+  recentQuestions: { questionId: string; text: string; answers: Partial<Record<AnswerKind, string>> }[]
+  history: HistoryEntry[]
   partial: Partial<Record<Source, string>>
   segments: TranscriptSegment[]
   status: Record<'mic' | 'system' | 'asr' | 'llm' | 'vision' | 'overlay' | 'protection' | 'network', ComponentStatus>

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { FetchFn } from '../providers/adapter'
+import { t } from '@shared/i18n'
 
 // I pin to a commit with known hashes: a moving branch could change the data under the same name.
 const TESSDATA = 'https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/87416418657359cb625c412a48b6e1d6d41c29bd'
@@ -34,15 +35,16 @@ export class Ocr {
       const p = join(this.dir, `${l}.traineddata`)
       if (existsSync(p)) continue
       const res = await this.fetch(`${TESSDATA}/${l}.traineddata`)
-      if (!res.ok) throw new Error(`OCR-данные ${l}: HTTP ${res.status}`)
+      if (!res.ok) throw new Error(t('OCR-данные {lang}: HTTP {status}', { lang: l, status: res.status }))
       const data = Buffer.from(await res.arrayBuffer())
-      if (createHash('sha256').update(data).digest('hex') !== SHA256[l]) throw new Error(`OCR-данные ${l}: контрольная сумма не совпала — файл не сохранён`)
+      if (createHash('sha256').update(data).digest('hex') !== SHA256[l])
+        throw new Error(t('OCR-данные {lang}: контрольная сумма не совпала — файл не сохранён', { lang: l }))
       writeFileSync(p, data)
     }
   }
 
   async recognize(png: Buffer): Promise<string> {
-    if (!this.installed()) throw new Error('OCR не установлен — скачайте языковые данные в «Диагностике»')
+    if (!this.installed()) throw new Error(t('OCR не установлен — скачайте языковые данные в «Диагностике»'))
     if (!this.worker) {
       const { createWorker } = await import('tesseract.js')
       this.worker = (await createWorker(LANGS.join('+'), 1, { langPath: this.dir, cachePath: this.dir, gzip: false })) as unknown as Worker

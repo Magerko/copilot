@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyVocabulary, diagnoseWhisperFailure, isHallucination, stripTags } from '../src/main/asr/whisper'
+import { applyVocabulary, diagnoseWhisperFailure, isHallucination, isPromptEcho, stripTags, vocabularyPrompt } from '../src/main/asr/whisper'
 
 const VOCAB = ['PostgreSQL', 'FastAPI', 'Kubernetes', 'Docker', 'React', 'TypeScript']
 
@@ -69,5 +69,22 @@ describe('whisper-server crash diagnosis', () => {
   it('returns null for a clean/unknown exit', () => {
     expect(diagnoseWhisperFailure(0, ['server listening on 127.0.0.1'])).toBeNull()
     expect(diagnoseWhisperFailure(null, [])).toBeNull()
+  })
+})
+
+describe('vocabulary as a whisper prompt', () => {
+  const vocab = ['SDLC', 'STLC', 'Playwright', 'TestRail']
+
+  it('builds a short glossary prompt', () => {
+    expect(vocabularyPrompt(vocab)).toBe('Glossary: SDLC, STLC, Playwright, TestRail.')
+    expect(vocabularyPrompt([])).toBe('')
+    expect(vocabularyPrompt(Array.from({ length: 200 }, (_, i) => `Term${i}`)).length).toBeLessThan(320)
+  })
+
+  it('drops the prompt coming back on silence, keeps real speech with the terms', () => {
+    expect(isPromptEcho('Glossary: SDLC, STLC, Playwright.', vocab)).toBe(true)
+    expect(isPromptEcho('SDLC, STLC, Playwright', vocab)).toBe(true)
+    expect(isPromptEcho('В чому різниця між SDLC та STLC?', vocab)).toBe(false)
+    expect(isPromptEcho('', vocab)).toBe(false)
   })
 })
