@@ -22,6 +22,8 @@ The interface is mostly in Russian. Choosing English in the settings translates 
 - Buttons and auto-answer in the hint window, plus a collapsing main window.
 - Better pickup of quiet and short speech, with less CPU and GPU load.
 - Number-based hotkeys that work with one hand on any keyboard layout.
+- The answer hotkey answers the question being asked right now, even mid-sentence.
+- macOS-style window buttons in the hint window.
 
 ## Screenshots
 The data in these screenshots is fictional.
