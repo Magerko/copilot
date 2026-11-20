@@ -35,6 +35,9 @@ export const DEFAULT_COORDINATOR: CoordinatorOptions = {
   followUpWindowMs: 30_000
 }
 
+// A phrase cut by answer-now continues right where it stopped, and the two timestamps come from different clocks.
+const CLOCK_JITTER_MS = 300
+
 interface Tracked extends Utterance {
   consumed: boolean
 }
@@ -97,7 +100,7 @@ export class QuestionCoordinator {
         return { type: 'duplicate', of: a.questionId }
       }
       const gap = u.startMs - a.endMs
-      if (gap >= 0 && gap <= this.opts.continuationGapMs && kind !== 'unknown') {
+      if (gap >= -CLOCK_JITTER_MS && gap <= this.opts.continuationGapMs && kind !== 'unknown') {
         tracked.consumed = true
         return this.revise(a, `${a.text} ${text}`, u.endMs, mergeKind(a.kind, kind))
       }
@@ -133,16 +136,18 @@ export class QuestionCoordinator {
       const now = Math.max(this.activeQ?.endMs ?? 0, this.recent.at(-1)?.endMs ?? 0)
       return this.open(t, { source: 'user', text: t, startMs: now, endMs: now }, classify(t).kind, 'typed')
     }
+    // Anything heard before the active question is older than it, so it must not replace it.
+    const floor = this.activeQ?.endMs ?? -1
+    const fresh = this.recent.filter((r) => !r.consumed && r.endMs > floor)
     const last = this.pending.at(-1)
-    if (last) return this.confirmCandidate(last.questionId, trigger)
-    const fresh = this.recent.filter((r) => r.source === 'remote' && !r.consumed)
+    if (last && last.u.endMs > floor && last.u.endMs >= (fresh.at(-1)?.endMs ?? 0)) return this.confirmCandidate(last.questionId, trigger)
     if (fresh.length) {
       const lastEnd = fresh[fresh.length - 1].endMs
       const span = fresh.filter((r) => lastEnd - r.startMs <= 15_000).slice(-2)
       for (const r of span) r.consumed = true
       const text = span.map((r) => r.text).join(' ')
       const kind = classify(text).kind
-      return this.open(text, { source: 'remote', text, startMs: span[0].startMs, endMs: lastEnd }, kind === 'statement' ? 'question' : kind, trigger)
+      return this.open(text, { source: span[span.length - 1].source, text, startMs: span[0].startMs, endMs: lastEnd }, kind === 'statement' ? 'question' : kind, trigger)
     }
     if (this.activeQ) return { type: 'reanswer', question: this.activeQ }
     return { type: 'ignore', reason: 'nothing_to_answer' }

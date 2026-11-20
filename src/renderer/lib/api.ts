@@ -13,7 +13,8 @@ import type {
   ResumableSession,
   ScreenTask,
   SessionSummary,
-  Settings
+  Settings,
+  Source
 } from '@shared/types'
 
 interface Bridge {
@@ -26,11 +27,12 @@ interface Bridge {
   onScroll(cb: (dir: number) => void): () => void
   onPickerInit(cb: (m: PickerInit) => void): () => void
   sendAudio(m: unknown): void
+  sendAudioFlushed(): void
   sendLevel(m: unknown): void
   sendAudioStatus(m: unknown): void
 }
 
-export type CaptureMsg = { action: 'start'; sessionId: string; startedAt: number } | { action: 'stop' | 'pause' | 'resume' }
+export type CaptureMsg = { action: 'start'; sessionId: string; startedAt: number } | { action: 'flush'; sources: Source[] } | { action: 'stop' | 'pause' | 'resume' }
 export interface PickerInit {
   codeLang: string
   dataUrl: string

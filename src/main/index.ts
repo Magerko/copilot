@@ -95,6 +95,10 @@ let overlay: BrowserWindow | null = null
 let picker: BrowserWindow | null = null
 let tray: Tray | null = null
 let quitting = false
+let flushAck: (() => void) | null = null
+const FLUSH_ACK_MS = 300
+// A partial in progress plus the final each hold the GPU for about a second.
+const SETTLE_MS = 5000
 const shortcutConflicts: string[] = []
 
 function log(kind: string, data: unknown): void {
@@ -426,6 +430,19 @@ function panic(): void {
 }
 
 // A silent hotkey looks broken, so the overlay says why nothing happened.
+/** Cuts the phrase being spoken and waits for its transcript; the limits keep a stuck renderer or ASR from swallowing the key press. */
+async function settleSpeech(): Promise<void> {
+  const within = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+  const flushed = new Promise<void>((resolve) => {
+    flushAck = resolve
+    const sources: Source[] = sessionMgr.answersUser ? ['remote', 'user'] : ['remote']
+    dashboard?.webContents.send('km:capture', { action: 'flush', sources })
+  })
+  await Promise.race([flushed, within(FLUSH_ACK_MS)])
+  flushAck = null
+  await Promise.race([asr.settled(), within(SETTLE_MS)])
+}
+
 function answerHotkey(kind: 'say' | 'deep'): void {
   if (!overlay?.isVisible()) showOverlay()
   if (sessionMgr.active) sessionMgr.answerNow(kind, 'hotkey')
@@ -752,6 +769,7 @@ function registerIpc(): void {
       })
     }
   )
+  ipcMain.on('km:audio-flushed', () => flushAck?.())
   ipcMain.on('km:csp', (_e, m: { url: string; directive: string }) => {
     log('renderer_blocked', { url: String(m.url).split('?')[0].slice(0, 200), by: 'csp', directive: String(m.directive).slice(0, 40) })
   })
@@ -917,6 +935,7 @@ app.whenReady().then(() => {
     now: Date.now,
     emit,
     log,
+    settleSpeech,
     outcome: (providerId, model, ok) => {
       const key = `${providerId}/${model}`
       if (registry.textOk.get(key) === ok) return

@@ -31,9 +31,9 @@ class FakeAdapter implements ProviderAdapter {
   }
 }
 
-function setup(opts: { local?: boolean; cloudConsent?: boolean; delayMs?: number; failLocal?: boolean; offline?: boolean; history?: boolean } = {}) {
+function setup(opts: { local?: boolean; cloudConsent?: boolean; delayMs?: number; failLocal?: boolean; offline?: boolean; history?: boolean; autoAnswer?: boolean; settleSpeech?: () => Promise<void> } = {}) {
   const settings: Settings = deepMerge(DEFAULT_SETTINGS, {
-    autoAnswer: true,
+    autoAnswer: opts.autoAnswer ?? true,
     history: opts.history ?? false,
     offline: opts.offline ?? false,
     consent: { cloud: opts.cloudConsent ?? false, history: opts.history ?? false }
@@ -75,7 +75,8 @@ function setup(opts: { local?: boolean; cloudConsent?: boolean; delayMs?: number
     newId: () => `id${++n}`,
     now: Date.now,
     emit: () => {},
-    log: () => {}
+    log: () => {},
+    settleSpeech: opts.settleSpeech
   })
   return { mgr, adapter, cloud, db }
 }
@@ -87,6 +88,47 @@ async function until(cond: () => boolean, ms = 2000) {
     await sleep(5)
   }
 }
+
+describe('answer-now during a phrase', () => {
+  const heard = (mgr: SessionManager, text: string, startMs: number, endMs: number) =>
+    mgr.onSegment({ sessionId: mgr.snap.sessionId!, segmentId: `s${startMs}`, source: 'remote', startMs, endMs, text, isFinal: true, lang: 'ru' })
+
+  it('waits for the phrase on screen and answers it, not the previous question', async () => {
+    let finish = () => {}
+    const { mgr } = setup({ autoAnswer: false, settleSpeech: () => new Promise((r) => (finish = r)) })
+    mgr.start({ mode: 'live' })
+    heard(mgr, 'Как работает сборщик мусора в Java?', 0, 2000)
+    mgr.answerNow('say', 'hotkey')
+    expect(mgr.snap.answers.say).toBeUndefined()
+    heard(mgr, 'Чем отличается процесс от потока?', 30_000, 32_000)
+    finish()
+    await until(() => mgr.snap.answers.say?.status === 'done')
+    expect(mgr.snap.answers.say?.text).toBe('answer for Чем отличается процесс от потока?')
+  })
+
+  it('does not answer twice when auto-answer took the same phrase', async () => {
+    let finish = () => {}
+    const { mgr, adapter } = setup({ delayMs: 15, settleSpeech: () => new Promise((r) => (finish = r)) })
+    mgr.start({ mode: 'live' })
+    mgr.answerNow('say', 'hotkey')
+    mgr.answerNow('say', 'hotkey')
+    heard(mgr, 'Чем отличается процесс от потока?', 0, 2000)
+    finish()
+    await until(() => mgr.snap.answers.say?.status === 'done' && mgr.snap.answers.points?.status === 'done')
+    expect(adapter.calls).toHaveLength(2)
+  })
+
+  it('keeps answering when the rest of the question arrives with auto-answer off', async () => {
+    const { mgr } = setup({ autoAnswer: false, settleSpeech: async () => {} })
+    mgr.start({ mode: 'live' })
+    heard(mgr, 'Чем отличается процесс', 0, 2000)
+    mgr.answerNow('say', 'hotkey')
+    await until(() => !!mgr.snap.activeQuestion)
+    heard(mgr, 'Какие бывают потоки?', 2100, 4000)
+    await until(() => mgr.snap.activeQuestion?.revision === 2 && mgr.snap.answers.say?.status === 'done')
+    expect(mgr.snap.answers.say?.text).toContain('Какие бывают потоки?')
+  })
+})
 
 describe('SessionManager', () => {
   it('typed question yields say + points and settles in answer_ready', async () => {

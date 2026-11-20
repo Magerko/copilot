@@ -26,6 +26,7 @@ const api = {
   onScroll: on('km:scroll'),
   onPickerInit: on('km:picker-init'),
   sendAudio: (m: unknown) => ipcRenderer.send('km:audio', m),
+  sendAudioFlushed: () => ipcRenderer.send('km:audio-flushed'),
   sendLevel: (m: unknown) => ipcRenderer.send('km:level', m),
   sendAudioStatus: (m: unknown) => ipcRenderer.send('km:audio-status', m)
 }
