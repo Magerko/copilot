@@ -43,6 +43,8 @@ export interface SessionDeps {
   emit(): void
   log(kind: string, data: unknown): void
   outcome?(providerId: string, model: string, ok: boolean): void
+  /** Resolves once the phrase being spoken right now has been cut and transcribed. */
+  settleSpeech?(): Promise<void>
 }
 
 interface Inflight {
@@ -87,6 +89,7 @@ export class SessionManager {
   private startedAt = 0
   private persist = true
   private answerUserSource = false
+  private settling = false
 
   constructor(private d: SessionDeps) {}
 
@@ -232,7 +235,26 @@ export class SessionManager {
       this.generate(this.coord.active, ['deep'])
       return
     }
-    this.handle(this.coord.manual(trigger), 'manual')
+    if (!this.d.settleSpeech) {
+      this.answerHeard(trigger)
+      return
+    }
+    // The transcript on screen is ahead of the coordinator, which only gets finished phrases.
+    if (this.settling) return
+    this.settling = true
+    const session = this.snap.sessionId
+    void this.d.settleSpeech().finally(() => {
+      this.settling = false
+      if (this.snap.sessionId === session) this.answerHeard(trigger)
+    })
+  }
+
+  private answerHeard(trigger: 'manual' | 'hotkey'): void {
+    if (!this.coord) return
+    const dec = this.coord.manual(trigger)
+    // Auto-answer may have started on the phrase that just settled.
+    if (dec.type === 'reanswer' && [...this.inflight.values()].some((f) => f.kind === 'say' && f.questionId === dec.question.questionId && f.revision === dec.question.revision)) return
+    this.handle(dec, 'manual')
   }
 
   askTyped(text: string): void {
@@ -286,7 +308,8 @@ export class SessionManager {
       case 'new':
       case 'revise': {
         this.applyQuestion(dec.question)
-        const auto = via === 'manual' || s.autoAnswer
+        // A question the user asked to answer stays answered when its tail arrives, even with auto-answer off.
+        const auto = via === 'manual' || s.autoAnswer || (dec.type === 'revise' && dec.question.trigger !== 'auto')
         if (auto) this.generate(dec.question, ['say', 'points'])
         else this.snap.state = 'question_confirmed'
         break

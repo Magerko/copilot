@@ -58,6 +58,7 @@ export function App() {
           })
           setPage('live')
         } else if (m.action === 'stop') void capture.current.stop()
+        else if (m.action === 'flush') capture.current.flush(m.sources)
         else if (m.action === 'pause') void capture.current.pause()
         else void capture.current.resume()
       }),

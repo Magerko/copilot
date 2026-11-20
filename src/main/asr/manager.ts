@@ -38,6 +38,8 @@ export class AsrManager {
   private sidecar: WhisperSidecar | null = null
   private queue: AsrJob[] = []
   private busy = false
+  private current: AsrJob | null = null
+  private settledWaiters: (() => void)[] = []
   private restarts = 0
   private st: AsrStatus
 
@@ -144,12 +146,30 @@ export class AsrManager {
     void this.pump()
   }
 
+  /** Resolves when every final received so far has been emitted; partials don't hold it up. */
+  settled(): Promise<void> {
+    if (!this.finalsPending()) return Promise.resolve()
+    return new Promise((resolve) => this.settledWaiters.push(resolve))
+  }
+
+  private finalsPending(): boolean {
+    return !!this.current?.final || this.queue.some((j) => j.final)
+  }
+
+  private releaseSettled(): void {
+    if (this.finalsPending()) return
+    for (const resolve of this.settledWaiters.splice(0)) resolve()
+  }
+
   private async pump(): Promise<void> {
     if (this.busy) return
     this.busy = true
     try {
       while (this.queue.length) {
+        this.current = null
+        this.releaseSettled()
         const job = this.queue.shift()!
+        this.current = job
         if (!(await this.ensure())) {
           if (job.final) this.emit(job, '', null)
           continue
@@ -183,7 +203,9 @@ export class AsrManager {
         }
       }
     } finally {
+      this.current = null
       this.busy = false
+      this.releaseSettled()
     }
   }
 

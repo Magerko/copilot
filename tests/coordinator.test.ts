@@ -91,6 +91,37 @@ describe('QuestionCoordinator', () => {
     expect(m.type).toBe('new')
   })
 
+  it('answer-now takes the latest phrase, not an older candidate', () => {
+    const c = coord()
+    c.onUtterance({ source: 'remote', text: 'опыт с докером', startMs: 0, endMs: 1000 })
+    c.onUtterance({ source: 'remote', text: 'Мы сейчас используем микросервисную архитектуру в компании', startMs: 30_000, endMs: 32_000 })
+    const m = c.manual('hotkey')
+    expect(m.type === 'new' && m.question.text).toBe('Мы сейчас используем микросервисную архитектуру в компании')
+  })
+
+  it('answer-now re-answers the active question instead of reviving what was said before it', () => {
+    const c = coord()
+    c.onUtterance({ source: 'remote', text: 'опыт с докером', startMs: 0, endMs: 1000 })
+    c.onUtterance({ source: 'remote', text: 'Мы сейчас используем микросервисную архитектуру в компании', startMs: 2000, endMs: 4000 })
+    c.onUtterance({ source: 'remote', text: 'Как работает сборщик мусора в Java?', startMs: 30_000, endMs: 32_000 })
+    const m = c.manual('hotkey')
+    expect(m.type === 'reanswer' && m.question.text).toBe('Как работает сборщик мусора в Java?')
+  })
+
+  it('answer-now picks up a statement in practice mode', () => {
+    const c = coord(true)
+    c.onUtterance({ source: 'user', text: 'Мы сейчас используем микросервисную архитектуру в компании', startMs: 0, endMs: 2000 })
+    const m = c.manual('hotkey')
+    expect(m.type === 'new' && m.question.source).toBe('user')
+  })
+
+  it('the tail of a phrase cut by answer-now joins the question despite clock jitter', () => {
+    const c = coord()
+    c.onUtterance({ source: 'remote', text: 'Как работает сборщик мусора?', startMs: 0, endMs: 2000 })
+    const d = c.onUtterance({ source: 'remote', text: 'Как он работает в Java?', startMs: 1900, endMs: 3000 })
+    expect(d.type).toBe('revise')
+  })
+
   it('answer-now with nothing heard reports it instead of inventing a question', () => {
     expect(coord().manual('hotkey').type).toBe('ignore')
   })

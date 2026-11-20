@@ -186,6 +186,12 @@ export class CaptureController {
     this.opts = null
   }
 
+  /** IPC keeps order, so main sees the acknowledgement after the finals this produced. */
+  flush(sources: Source[]): void {
+    for (const src of sources) this.channels[src]?.vad.flush()
+    km.sendAudioFlushed()
+  }
+
   private async open(source: Source): Promise<void> {
     const o = this.opts
     if (!o) return
