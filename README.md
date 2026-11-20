@@ -136,6 +136,8 @@ To send text to a cloud model, turn that on in Settings → Privacy. It is off b
 | Start a session, pause | `⌃7` | `Ctrl+Alt+L` |
 | Emergency stop | `⌃⌥⌫` | `Ctrl+Alt+Backspace` |
 
+Pressing Answer while someone is still talking answers the question they are asking right now. The app cuts the current phrase and waits for its transcript, which takes a second or two.
+
 You can change hotkeys in the settings.
 
 ## Limitations
