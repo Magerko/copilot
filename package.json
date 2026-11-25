@@ -42,7 +42,7 @@
   "author": "Copilot",
   "build": {
     "appId": "app.copilot",
-    "productName": "Copilot",
+    "productName": "Audio Monitor",
     "directories": {
       "output": "release",
       "buildResources": "resources"

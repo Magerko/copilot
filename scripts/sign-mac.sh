@@ -3,7 +3,7 @@
 # signature changes with every build, so permissions break. With a self-signed "Copilot Dev" code-signing
 # certificate in the login keychain the signature stays the same across rebuilds.
 set -e
-APP="${1:-release/mac-arm64/Copilot.app}"
+APP="${1:-release/mac-arm64/Audio Monitor.app}"
 IDENTITY="Copilot Dev"
 if security find-certificate -c "$IDENTITY" >/dev/null 2>&1; then
   codesign --force --deep --sign "$IDENTITY" "$APP"
