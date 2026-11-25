@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- V8 compiles JavaScript at run time. -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <!-- A self-signed certificate has no Team ID, so library validation would reject Electron's own frameworks. -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+  <!-- The hardened runtime blocks the microphone without this. -->
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
+</dict>
+</plist>

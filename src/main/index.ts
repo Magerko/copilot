@@ -57,6 +57,8 @@ import { createDashboard, createOverlay, createPicker, displayProtectionSupporte
 const isMac = process.platform === 'darwin'
 if (process.platform === 'win32') app.setAppUserModelId('app.copilot')
 // Chromium has system-audio loopback on macOS (ScreenCaptureKit, 13+) behind these features; Windows uses WASAPI without them.
+// A debugging port would let any local process drive the windows and read history through them.
+if (app.isPackaged && ['remote-debugging-port', 'remote-debugging-pipe', 'remote-allow-origins'].some((f) => app.commandLine.hasSwitch(f))) process.exit(1)
 if (isMac) app.commandLine.appendSwitch('enable-features', 'MacLoopbackAudioForScreenShare,MacSckSystemAudioLoopbackOverride')
 // Runtime data stays outside OneDrive/Cyrillic paths: whisper.cpp opens model files with ANSI APIs.
 // The app was renamed kairos-m → copilot; the old data folder moves once.
