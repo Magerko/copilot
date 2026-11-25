@@ -50,12 +50,12 @@ The data in these screenshots is fictional.
 You need macOS 13 or later, Apple Silicon, and [Homebrew](https://brew.sh), which the app uses to install speech recognition.
 
 ### Download
-1. Download the `.dmg` from [Releases](https://github.com/filooww/copilot/releases) and drag Audio Monitor to Applications. On a Mac the app is called Audio Monitor, so its name in Activity Monitor and the Dock doesn't give it away.
+1. Download the `.dmg` from [Releases](https://github.com/filooww/copilot/releases) and drag Copilot to Applications. In Activity Monitor its processes are named Audio Monitor.
 2. Open the app. macOS will block it because it is not notarized by Apple.
 3. Go to System Settings → Privacy & Security and click **Open Anyway**. Or run this command once:
 
 ```bash
-xattr -cr "/Applications/Audio Monitor.app"
+xattr -cr /Applications/Copilot.app
 ```
 
 4. Allow access to the microphone and screen recording. Without screen recording, the app can't hear the other person.

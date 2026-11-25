@@ -1,7 +1,7 @@
 {
   "name": "copilot",
   "productName": "Copilot",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Local-first AI interview & meeting copilot (BYOK)",
   "main": "out/main/index.js",
   "private": true,
@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "dist": "electron-vite build && electron-builder --win nsis",
-    "dist:mac": "electron-vite build && electron-builder --mac dmg",
+    "dist:mac": "electron-vite build && electron-builder --mac dir --arm64 && sh scripts/sign-mac.sh && sh scripts/dmg-mac.sh",
     "icon": "node scripts/make-icon.ts",
     "dist:dir": "electron-vite build && electron-builder --win dir",
     "dist:mac:dir": "electron-vite build && electron-builder --mac dir",
@@ -97,7 +97,7 @@
       }
     },
     "dmg": {
-      "artifactName": "AudioMonitor-${version}-${arch}.${ext}"
+      "artifactName": "Copilot-${version}-${arch}.${ext}"
     },
     "nsis": {
       "artifactName": "Copilot Setup ${version}.${ext}",

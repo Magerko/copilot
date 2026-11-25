@@ -8,6 +8,9 @@ IDENTITY="Copilot Dev"
 # The hardened runtime blocks DYLD_INSERT_LIBRARIES and debugger attachment, so other processes can't borrow the
 # app's microphone, screen and Keychain access.
 ENT="$(dirname "$0")/../resources/entitlements.mac.plist"
+# Activity Monitor shows CFBundleName (Audio Monitor), while Finder, Launchpad, Spotlight and the Dock show the
+# folder name (Copilot). A CFBundleDisplayName would override both, so the bundle has none.
+/usr/libexec/PlistBuddy -c "Delete :CFBundleDisplayName" "$APP/Contents/Info.plist" 2>/dev/null || true
 if security find-certificate -c "$IDENTITY" >/dev/null 2>&1; then
   codesign --force --deep --options runtime --entitlements "$ENT" --sign "$IDENTITY" "$APP"
 else
@@ -16,7 +19,10 @@ else
 fi
 codesign --verify --deep "$APP"
 codesign -d -r- "$APP" 2>&1 | tail -1
-# Spotlight finds the app by "copilot" too, while its visible name stays Audio Monitor. The attribute sits on the
-# bundle folder, outside the signature.
-KW='<plist version="1.0"><array><string>Copilot</string><string>Копилот</string></array></plist>'
-xattr -wx com.apple.metadata:kMDItemKeywords "$(printf '%s' "$KW" | plutil -convert binary1 -o - - | xxd -p | tr -d '\n')" "$APP"
+# The folder name is outside the signature.
+if [ "$(basename "$APP")" = "Audio Monitor.app" ]; then
+  DEST="$(dirname "$APP")/Copilot.app"
+  rm -rf "$DEST"
+  mv "$APP" "$DEST"
+  echo "$DEST"
+fi
