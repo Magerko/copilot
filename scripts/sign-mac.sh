@@ -16,3 +16,7 @@ else
 fi
 codesign --verify --deep "$APP"
 codesign -d -r- "$APP" 2>&1 | tail -1
+# Spotlight finds the app by "copilot" too, while its visible name stays Audio Monitor. The attribute sits on the
+# bundle folder, outside the signature.
+KW='<plist version="1.0"><array><string>Copilot</string><string>Копилот</string></array></plist>'
+xattr -wx com.apple.metadata:kMDItemKeywords "$(printf '%s' "$KW" | plutil -convert binary1 -o - - | xxd -p | tr -d '\n')" "$APP"
