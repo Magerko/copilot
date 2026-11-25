@@ -179,7 +179,7 @@ export interface KnowledgeDoc {
 }
 
 export type ShortcutAction =
-  'toggleOverlay' | 'toggleListen' | 'answerNow' | 'toggleAuto' | 'snapRegion' | 'solveScreen' | 'scrollUp' | 'scrollDown' | 'expand' | 'panic'
+  'toggleOverlay' | 'toggleListen' | 'answerNow' | 'toggleAuto' | 'snapRegion' | 'solveScreen' | 'scrollUp' | 'scrollDown' | 'expand' | 'panic' | 'toggleDock'
 
 export interface OverlaySettings {
   bounds: { x: number; y: number; width: number; height: number } | null
@@ -228,6 +228,8 @@ export interface WindowSettings {
   collapseOnSession: boolean
   protectFromCapture: boolean
   panicQuits: boolean
+  /** macOS only: no Dock icon and no entry in ⌘Tab. */
+  hideDock: boolean
 }
 
 export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }

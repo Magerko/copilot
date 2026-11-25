@@ -9,7 +9,8 @@ const MAC_SHORTCUTS: Partial<Record<ShortcutAction, string>> = {
   snapRegion: 'Control+4',
   toggleAuto: 'Control+5',
   toggleOverlay: 'Control+6',
-  toggleListen: 'Control+7'
+  toggleListen: 'Control+7',
+  toggleDock: 'Control+8'
 }
 
 const OLD_MAC_SHORTCUTS: Partial<Record<ShortcutAction, string[]>> = {
@@ -60,6 +61,8 @@ export const DEFAULT_SETTINGS: Settings = {
     scrollDown: 'Control+Alt+Down',
     expand: 'Control+Alt+E',
     panic: 'Control+Alt+Backspace',
+    // Windows has no Dock; the taskbar button stays.
+    toggleDock: '',
     ...(process.platform === 'darwin' ? MAC_SHORTCUTS : {})
   },
   codeLang: 'Python',
@@ -69,7 +72,7 @@ export const DEFAULT_SETTINGS: Settings = {
   roles: {},
   activeProfileId: 'default',
   consent: { mic: false, system: false, screen: false, cloud: false, history: false, participants: false, acceptedAt: null },
-  window: { minimizeToTray: true, collapseOnSession: true, protectFromCapture: true, panicQuits: false }
+  window: { minimizeToTray: true, collapseOnSession: true, protectFromCapture: true, panicQuits: false, hideDock: false }
 }
 
 export function deepMerge<T>(base: T, patch: DeepPartial<T> | undefined): T {
