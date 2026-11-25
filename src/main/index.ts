@@ -198,6 +198,7 @@ function applySettings(prev: Settings | null): void {
     if (prev.overlay.theme !== o.theme) overlay.setBackgroundColor(o.theme === 'dark' ? '#14161b' : '#f7f7f5')
   }
   if (!prev || prev.window.protectFromCapture !== st.window.protectFromCapture) applyWindowProtection()
+  if (!prev || prev.window.hideDock !== st.window.hideDock) applyDock()
   updateLlmStatus()
   broadcast('km:settings', st)
   if (sessionMgr?.active) prepareAnswerModels()
@@ -251,6 +252,20 @@ function ensureOverlay(): BrowserWindow {
   })
   applyProtection()
   return overlay
+}
+
+function applyDock(): void {
+  if (!isMac || !app.dock) return
+  if (s().window.hideDock) app.dock.hide()
+  else void app.dock.show()
+  refreshTray()
+}
+
+function toggleDock(): void {
+  if (!isMac) return
+  const prev = structuredClone(s())
+  settings.patch({ window: { hideDock: !prev.window.hideDock } })
+  applySettings(prev)
 }
 
 function showOverlay(): void {
@@ -464,7 +479,8 @@ const SHORTCUT_ACTIONS: Record<ShortcutAction, () => void> = {
     broadcast('km:settings', s())
     if (expanded && !sessionMgr.snap.answers.deep) answerHotkey('deep')
   },
-  panic
+  panic,
+  toggleDock
 }
 
 /** OS hotkeys, not a keyboard hook, so nothing can leak if the app crashes. */
@@ -618,6 +634,7 @@ function refreshTray(): void {
         ? { label: sessionMgr.snap.listening ? 'Пауза' : 'Продолжить', click: toggleListen }
         : { label: 'Начать сессию', click: () => startSession('live', true) },
       ...(active ? [{ label: 'Завершить сессию', click: stopSession }] : []),
+      ...(isMac ? [{ label: s().window.hideDock ? 'Показать значок в Доке' : 'Скрыть значок из Дока', click: toggleDock }] : []),
       { type: 'separator' },
       { label: 'Аварийная остановка', click: panic },
       { label: 'Выход', click: () => app.quit() }

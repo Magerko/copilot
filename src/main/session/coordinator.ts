@@ -68,7 +68,8 @@ export class QuestionCoordinator {
     return !!this.activeQ && this.activeQ.questionId === questionId && this.activeQ.revision === revision
   }
 
-  onUtterance(u: Utterance): Decision {
+  /** `hold`: the user is reading an answer, so a new question waits as a candidate instead of replacing it. */
+  onUtterance(u: Utterance, hold = false): Decision {
     const text = u.text.trim()
     if (!text) return { type: 'ignore', reason: 'empty' }
     this.recent = this.recent.filter((r) => u.endMs - r.endMs < 60_000)
@@ -99,14 +100,18 @@ export class QuestionCoordinator {
         tracked.consumed = true
         return { type: 'duplicate', of: a.questionId }
       }
+      // Once answered, the question is final: merging later speech into it would wipe the answer being read.
       const gap = u.startMs - a.endMs
-      if (gap >= -CLOCK_JITTER_MS && gap <= this.opts.continuationGapMs && kind !== 'unknown') {
+      if (a.status !== 'answered' && gap >= -CLOCK_JITTER_MS && gap <= this.opts.continuationGapMs && kind !== 'unknown') {
         tracked.consumed = true
         return this.revise(a, `${a.text} ${text}`, u.endMs, mergeKind(a.kind, kind))
       }
       if (kind === 'follow_up' && confidence === 'high' && u.startMs - a.endMs <= this.opts.followUpWindowMs) {
-        tracked.consumed = true
-        return this.revise(a, `${a.text} → ${text}`, u.endMs, a.kind)
+        if (a.status !== 'answered') {
+          tracked.consumed = true
+          return this.revise(a, `${a.text} → ${text}`, u.endMs, a.kind)
+        }
+        return this.ask(`${a.text} → ${text}`, { ...u, text: `${a.text} → ${text}` }, a.kind, tracked, hold)
       }
     }
 
@@ -117,16 +122,21 @@ export class QuestionCoordinator {
     }
 
     const askable = kind === 'question' || kind === 'coding_task' || kind === 'screen_reference' || kind === 'follow_up'
-    if (askable && confidence === 'high') {
-      tracked.consumed = true
-      return this.open(text, u, kind, 'auto')
-    }
-    if (askable) {
-      const c = { questionId: this.newId(), text, kind, reason: 'нет явных признаков вопроса', u }
-      this.pending = [...this.pending.slice(-2), c]
-      return { type: 'candidate', candidate: { questionId: c.questionId, text, kind, reason: c.reason } }
-    }
+    if (askable && confidence === 'high') return this.ask(text, u, kind, tracked, hold)
+    if (askable) return this.propose(text, u, kind, 'нет явных признаков вопроса')
     return { type: 'ignore', reason: kind }
+  }
+
+  private ask(text: string, u: Utterance, kind: UtteranceKind, tracked: Tracked, hold: boolean): Decision {
+    if (hold) return this.propose(text, u, kind, 'вы читаете ответ')
+    tracked.consumed = true
+    return this.open(text, u, kind, 'auto')
+  }
+
+  private propose(text: string, u: Utterance, kind: UtteranceKind, reason: string): Decision {
+    const c = { questionId: this.newId(), text, kind, reason, u }
+    this.pending = [...this.pending.slice(-2), c]
+    return { type: 'candidate', candidate: { questionId: c.questionId, text, kind, reason } }
   }
 
   manual(trigger: QuestionTrigger, typed?: string): Decision {
@@ -200,7 +210,8 @@ export class QuestionCoordinator {
     this.history.push(q)
     if (this.history.length > 200) this.history.shift()
     this.activeQ = q
-    this.pending = this.pending.filter((p) => similarity(p.text, text) < this.opts.dupThreshold)
+    // Candidates heard before this question are behind it now.
+    this.pending = this.pending.filter((p) => p.u.endMs > u.endMs && similarity(p.text, text) < this.opts.dupThreshold)
     return { type: 'new', question: q, superseded: prev }
   }
 

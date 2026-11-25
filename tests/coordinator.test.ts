@@ -122,6 +122,34 @@ describe('QuestionCoordinator', () => {
     expect(d.type).toBe('revise')
   })
 
+  it('speech after an answered question never rewrites it', () => {
+    const c = coord()
+    const d = c.onUtterance({ source: 'remote', text: 'Как работает сборщик мусора?', startMs: 0, endMs: 2000 })
+    if (d.type !== 'new') throw new Error(d.type)
+    c.markAnswered(d.question.questionId, 1)
+    expect(c.onUtterance({ source: 'remote', text: 'Ну и вообще про память расскажите', startMs: 2500, endMs: 4000 }).type).not.toBe('revise')
+    expect(c.onUtterance({ source: 'remote', text: 'А почему именно так?', startMs: 6000, endMs: 7000 }, true).type).toBe('candidate')
+    expect(c.active?.text).toBe('Как работает сборщик мусора?')
+  })
+
+  it('a question heard while the user reads waits as a candidate and the answer key takes it', () => {
+    const c = coord()
+    c.onUtterance({ source: 'remote', text: 'Как работает сборщик мусора в Java?', startMs: 0, endMs: 2000 })
+    const d = c.onUtterance({ source: 'remote', text: 'Чем отличается процесс от потока?', startMs: 10_000, endMs: 12_000 }, true)
+    expect(d.type).toBe('candidate')
+    expect(c.active?.text).toBe('Как работает сборщик мусора в Java?')
+    const m = c.manual('hotkey')
+    expect(m.type === 'new' && m.question.text).toBe('Чем отличается процесс от потока?')
+    expect(c.candidates).toHaveLength(0)
+  })
+
+  it('a new question drops candidates heard before it', () => {
+    const c = coord()
+    c.onUtterance({ source: 'remote', text: 'опыт с докером', startMs: 0, endMs: 1000 })
+    c.onUtterance({ source: 'remote', text: 'Как работает сборщик мусора в Java?', startMs: 20_000, endMs: 22_000 })
+    expect(c.candidates).toHaveLength(0)
+  })
+
   it('answer-now with nothing heard reports it instead of inventing a question', () => {
     expect(coord().manual('hotkey').type).toBe('ignore')
   })

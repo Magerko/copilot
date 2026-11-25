@@ -30,6 +30,7 @@ const DICT: Record<string, [uk: string, en: string]> = {
   'Пауза — захват остановлен': ['Пауза — захоплення зупинено', 'Paused — capture stopped'],
   'Сессия не запущена': ['Сесію не запущено', 'No active session'],
   'Возможный вопрос': ['Можливе питання', 'Possible question'],
+  'Новый вопрос': ['Нове питання', 'New question'],
   'Это вопрос': ['Це питання', 'It is a question'],
   Нет: ['Ні', 'No'],
   Вопрос: ['Питання', 'Question'],

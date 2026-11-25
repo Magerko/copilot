@@ -155,6 +155,14 @@ function OverlayTab({ ctx, snap }: { ctx: Ctx; snap: AppSnapshot }) {
       </Section>
 
       <Section title="Окно и трей">
+        {isMac && (
+          <Toggle
+            on={ctx.settings.window.hideDock}
+            onChange={(v) => void ctx.patch({ window: { hideDock: v } })}
+            label={`Не показывать значок в Доке (${pretty(ctx.settings.shortcuts.toggleDock)})`}
+            hint="Copilot пропадает из Дока и из ⌘Tab, но продолжает работать. Главное окно — через значок в строке меню. Когда значок возвращается, macOS ненадолго делает Copilot активным."
+          />
+        )}
         <Toggle
           on={ctx.settings.window.collapseOnSession}
           onChange={(v) => void ctx.patch({ window: { collapseOnSession: v } })}
@@ -188,7 +196,8 @@ const SHORTCUT_LABEL: Record<ShortcutAction, string> = {
   scrollUp: 'Прокрутить подсказки вверх',
   scrollDown: 'Прокрутить подсказки вниз',
   expand: 'Развернуть / подробный ответ',
-  panic: 'Аварийная остановка всего'
+  panic: 'Аварийная остановка всего',
+  toggleDock: 'Скрыть / показать значок в Доке'
 }
 
 function toAccelerator(e: React.KeyboardEvent): string | null {
@@ -223,7 +232,7 @@ function ShortcutsTab({ ctx }: { ctx: Ctx }) {
       </div>
       {conflicts && <div className={`banner small ${conflicts.ok ? 'ok' : 'warn'}`}>{conflicts.detail}</div>}
       <div className="col" style={{ gap: 6 }}>
-        {(Object.keys(SHORTCUT_LABEL) as ShortcutAction[]).map((a) => (
+        {(Object.keys(SHORTCUT_LABEL) as ShortcutAction[]).filter((a) => isMac || a !== 'toggleDock').map((a) => (
           <div key={a} className="row">
             <span className="grow">{SHORTCUT_LABEL[a]}</span>
             {rec === a ? (

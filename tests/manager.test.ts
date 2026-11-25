@@ -31,7 +31,7 @@ class FakeAdapter implements ProviderAdapter {
   }
 }
 
-function setup(opts: { local?: boolean; cloudConsent?: boolean; delayMs?: number; failLocal?: boolean; offline?: boolean; history?: boolean; autoAnswer?: boolean; settleSpeech?: () => Promise<void> } = {}) {
+function setup(opts: { local?: boolean; cloudConsent?: boolean; delayMs?: number; failLocal?: boolean; offline?: boolean; history?: boolean; autoAnswer?: boolean; settleSpeech?: () => Promise<void>; now?: () => number } = {}) {
   const settings: Settings = deepMerge(DEFAULT_SETTINGS, {
     autoAnswer: opts.autoAnswer ?? true,
     history: opts.history ?? false,
@@ -73,7 +73,7 @@ function setup(opts: { local?: boolean; cloudConsent?: boolean; delayMs?: number
     // Default limits on purpose: maxConcurrent=2 is what exposed the abort/slot race.
     budget: new BudgetManager(settings.budget, {}, { now: Date.now, spentTodayBefore: () => 0 }),
     newId: () => `id${++n}`,
-    now: Date.now,
+    now: opts.now ?? Date.now,
     emit: () => {},
     log: () => {},
     settleSpeech: opts.settleSpeech
@@ -127,6 +127,38 @@ describe('answer-now during a phrase', () => {
     heard(mgr, 'Какие бывают потоки?', 2100, 4000)
     await until(() => mgr.snap.activeQuestion?.revision === 2 && mgr.snap.answers.say?.status === 'done')
     expect(mgr.snap.answers.say?.text).toContain('Какие бывают потоки?')
+  })
+})
+
+describe('answer on screen while the interviewer keeps talking', () => {
+  const heard = (mgr: SessionManager, text: string, startMs: number, endMs: number) =>
+    mgr.onSegment({ sessionId: mgr.snap.sessionId!, segmentId: `s${startMs}`, source: 'remote', startMs, endMs, text, isFinal: true, lang: 'ru' })
+
+  it('keeps the answer and offers the new question when auto-answer is off', async () => {
+    const { mgr } = setup({ autoAnswer: false, settleSpeech: async () => {} })
+    mgr.start({ mode: 'live' })
+    heard(mgr, 'Как работает сборщик мусора в Java?', 0, 2000)
+    mgr.answerNow('say', 'hotkey')
+    await until(() => mgr.snap.answers.say?.status === 'done')
+    heard(mgr, 'Ну и вообще про память расскажите подробнее', 2500, 4000)
+    heard(mgr, 'Чем отличается процесс от потока?', 9000, 11_000)
+    expect(mgr.snap.answers.say?.text).toBe('answer for Как работает сборщик мусора в Java?')
+    expect(mgr.snap.candidates.at(-1)?.text).toBe('Чем отличается процесс от потока?')
+    mgr.answerNow('say', 'hotkey')
+    await until(() => mgr.snap.answers.say?.text === 'answer for Чем отличается процесс от потока?' && mgr.snap.answers.say.status === 'done')
+  })
+
+  it('with auto-answer holds a new question for a while, then answers on its own', async () => {
+    let now = 1_000_000
+    const { mgr } = setup({ now: () => now })
+    mgr.start({ mode: 'live' })
+    heard(mgr, 'Как работает сборщик мусора в Java?', 0, 2000)
+    await until(() => mgr.snap.answers.say?.status === 'done' && mgr.snap.answers.points?.status === 'done')
+    heard(mgr, 'Чем отличается процесс от потока?', 5000, 7000)
+    expect(mgr.snap.activeQuestion?.text).toBe('Как работает сборщик мусора в Java?')
+    now += 30_000
+    heard(mgr, 'Что такое индекс в базе данных?', 40_000, 42_000)
+    await until(() => mgr.snap.answers.say?.text === 'answer for Что такое индекс в базе данных?')
   })
 })
 

@@ -97,6 +97,27 @@ export function Overlay() {
     .slice(0, expanded ? 5 : 3)
 
   const keys = settings.shortcuts
+  // While an answer is on screen a new question waits below it instead of replacing it.
+  const next = snap.candidates.at(-1)
+  const candidate = next && (
+    <div className="ov-cand">
+      <span className="faint">{t(q ? 'Новый вопрос' : 'Возможный вопрос')}:</span> {next.text}
+      <span className="row" style={{ marginTop: 6 }}>
+        <button className="ov-link" onClick={() => void api.session.confirm(next.questionId)}>
+          {q ? (
+            <>
+              {t('Ответить')} <kbd>{prettyShortcut(keys.answerNow)}</kbd>
+            </>
+          ) : (
+            t('Это вопрос')
+          )}
+        </button>
+        <button className="ov-link faint" onClick={() => void api.session.dismiss(next.questionId)}>
+          {t('Нет')}
+        </button>
+      </span>
+    </div>
+  )
   const more = async () => {
     if (expanded) await api.session.answerNow('deep')
     else await toggleExpand()
@@ -226,19 +247,7 @@ export function Overlay() {
             </div>
           )}
 
-          {snap.candidates.length > 0 && !q && (
-            <div className="ov-cand">
-              <span className="faint">{t('Возможный вопрос')}:</span> {snap.candidates[snap.candidates.length - 1].text}
-              <span className="row" style={{ marginTop: 6 }}>
-                <button className="ov-link" onClick={() => void api.session.confirm(snap.candidates[snap.candidates.length - 1].questionId)}>
-                  {t('Это вопрос')}
-                </button>
-                <button className="ov-link faint" onClick={() => void api.session.dismiss(snap.candidates[snap.candidates.length - 1].questionId)}>
-                  {t('Нет')}
-                </button>
-              </span>
-            </div>
-          )}
+          {!q && candidate}
 
           {tab === 'answer' || !expanded ? (
             <>
@@ -287,6 +296,7 @@ export function Overlay() {
                 </div>
               )}
               {snap.notice && <div className="ov-note">{snap.notice}</div>}
+              {q && candidate}
               {!q && !live && !snap.candidates.length && snap.sessionId && (
                 <div className="faint ov-hint">
                   Жду вопрос. <kbd>{prettyShortcut(keys.answerNow)}</kbd> — ответить сразу, <kbd>{prettyShortcut(keys.solveScreen)}</kbd> — решить задачу с
