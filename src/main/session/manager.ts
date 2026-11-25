@@ -56,6 +56,9 @@ interface Inflight {
   release: () => void
 }
 
+// Long enough to read a short answer out loud; a new question heard sooner waits for the answer key.
+const READ_HOLD_MS = 20_000
+
 const CLOUD_DENIED = 'Отправка в облако не разрешена — включите её в «Приватность» или выберите локальную модель'
 
 const OFF: ComponentStatus = { state: 'off', label: 'выкл.' }
@@ -90,6 +93,7 @@ export class SessionManager {
   private persist = true
   private answerUserSource = false
   private settling = false
+  private answeredAt = 0
 
   constructor(private d: SessionDeps) {}
 
@@ -226,7 +230,15 @@ export class SessionManager {
     while (this.finals.length && this.finals[0].endMs < cutoff) this.finals.shift()
     this.snap.segments = this.finals.slice(-40)
     if (this.persist) this.d.db.addSegment(seg)
-    this.handle(this.coord.onUtterance({ source: seg.source, text: seg.text, startMs: seg.startMs, endMs: seg.endMs }), 'auto')
+    this.handle(this.coord.onUtterance({ source: seg.source, text: seg.text, startMs: seg.startMs, endMs: seg.endMs }, this.reading()), 'auto')
+  }
+
+  /** Without auto-answer only the user switches questions; with it, a fresh answer gets time to be read first. */
+  private reading(): boolean {
+    const shown = this.board.answers.say ?? this.board.answers.screen
+    if (!shown?.text) return false
+    if (!this.d.settings().autoAnswer) return true
+    return shown.status === 'done' && this.d.now() - this.answeredAt < READ_HOLD_MS
   }
 
   answerNow(kind: AnswerKind = 'say', trigger: 'manual' | 'hotkey' = 'manual'): void {
@@ -321,7 +333,8 @@ export class SessionManager {
         this.generate(dec.question, ['deep'])
         break
       case 'candidate':
-        this.snap.state = 'question_candidate'
+        if (!this.snap.activeQuestion) this.snap.state = 'question_candidate'
+        else if (this.snap.state === 'partial_transcript') this.snap.state = 'answer_ready'
         break
       case 'duplicate':
         this.d.log('duplicate_suppressed', { of: dec.of })
@@ -522,7 +535,10 @@ export class SessionManager {
         this.d.db.addUsage(this.d.newId(), this.persist ? q.sessionId : null, target.cfg.id, target.model, res.usage.inputTokens, res.usage.outputTokens, cost)
         this.d.outcome?.(target.cfg.id, target.model, true)
         this.finish(ev, publish)
-        if (kind === 'say' || kind === 'screen') this.coord?.markAnswered(q.questionId, q.revision)
+        if (kind === 'say' || kind === 'screen') {
+          this.answeredAt = this.d.now()
+          this.coord?.markAnswered(q.questionId, q.revision)
+        }
         return
       } catch (e) {
         release(null)
