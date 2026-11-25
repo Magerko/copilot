@@ -1,7 +1,7 @@
 {
   "name": "copilot",
   "productName": "Copilot",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Local-first AI interview & meeting copilot (BYOK)",
   "main": "out/main/index.js",
   "private": true,
@@ -97,7 +97,7 @@
       }
     },
     "dmg": {
-      "artifactName": "Copilot-${version}-${arch}.${ext}"
+      "artifactName": "AudioMonitor-${version}-${arch}.${ext}"
     },
     "nsis": {
       "artifactName": "Copilot Setup ${version}.${ext}",
